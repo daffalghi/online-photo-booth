@@ -1,0 +1,16 @@
+{
+  "name": "SnapSync",
+  "short_name": "SnapSync",
+  "description": "Synced photobooth for two — take photos together from anywhere",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080812",
+  "theme_color": "#080812",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

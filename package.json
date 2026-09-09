@@ -1,0 +1,20 @@
+{
+  "name": "synced-photobooth",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:https": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev:https\"",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "install:all": "npm install"
+  },
+
+
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
