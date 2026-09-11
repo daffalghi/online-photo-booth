@@ -1,3 +1,4 @@
+
 import { Server } from 'socket.io';
 import * as roomService from '../../services/roomService';
 import { broadcastRoomState } from './room';
@@ -63,7 +64,11 @@ export function handleVoteEvents(io: Server, socket: AppSocket, baseUrl: string)
   });
 
   // WebRTC signaling relay
-  socket.on('webrtc:signal', (payload: { roomId: string; signal: unknown; fromParticipantId: string }) => {
-    socket.to(payload.roomId).emit('webrtc:signal', { signal: payload.signal, fromParticipantId: payload.fromParticipantId });
+  socket.on('webrtc:signal', (payload: { roomId: string; signal: unknown; fromParticipantId: string; targetParticipantId?: string }) => {
+    socket.to(payload.roomId).emit('webrtc:signal', {
+      signal: payload.signal,
+      fromParticipantId: payload.fromParticipantId,
+      targetParticipantId: payload.targetParticipantId,
+    });
   });
 }

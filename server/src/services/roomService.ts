@@ -1,4 +1,6 @@
 import knex from '../db';
+import path from 'path';
+import fs from 'fs';
 import {
   Room,
   Participant,
@@ -16,6 +18,7 @@ import {
 } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import generatedFrames from './generatedFrames.json';
+import { UPLOADS_DIR, RENDERS_DIR } from './compositeService';
 
 const DEFAULT_SETTINGS: RoomSettings = {
   shotCount: 3,
@@ -23,8 +26,9 @@ const DEFAULT_SETTINGS: RoomSettings = {
   layout: 'strip3',
 };
 
-const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
-const COMPLETED_ROOM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// 3 Days TTL (Auto-cleanup deletes all rooms and disk photo files older than 3 days)
+const ROOM_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const COMPLETED_ROOM_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -47,12 +51,26 @@ async function generateUniqueCode(): Promise<string> {
 
 // ─── Room ─────────────────────────────────────────────────────────────────
 
-export async function createRoom(settings: Partial<RoomSettings> = {}): Promise<Room> {
+export async function createRoom(settings: Partial<RoomSettings> = {}, pin?: string): Promise<Room> {
   const id = uuidv4();
   const code = await generateUniqueCode();
   const finalSettings = { ...DEFAULT_SETTINGS, ...settings };
   const now = Date.now();
-  const capacity = finalSettings.mode === 'solo' ? 1 : 2;
+  const capacity = finalSettings.mode === 'solo' ? 1 : finalSettings.mode === 'group' ? 6 : 2;
+
+  // Security is mandatory for Duo and Group modes
+  let sanitizedPin: string | null = null;
+  if (finalSettings.mode !== 'solo') {
+    if (!pin || !pin.trim()) {
+      throw new Error('PIN room wajib diisi untuk mode Berdua dan Grup demi keamanan privasi');
+    }
+    const cleaned = String(pin).trim().replace(/[^0-9]/g, '');
+    if (cleaned.length < 4 || cleaned.length > 6) {
+      throw new Error('PIN room wajib berupa 4 hingga 6 digit angka (0-9)');
+    }
+    sanitizedPin = cleaned;
+  }
+
   await knex<RoomRow>('rooms').insert({
     id,
     code,
@@ -63,6 +81,7 @@ export async function createRoom(settings: Partial<RoomSettings> = {}): Promise<
     current_round_status: 'waiting_ready',
     created_at: now,
     expires_at: now + ROOM_TTL_MS,
+    pin: sanitizedPin,
   });
   return (await getRoomById(id))!;
 }
@@ -110,8 +129,20 @@ export async function updateRoomSettings(roomId: string, settings: RoomSettings)
 export async function addParticipant(roomId: string, displayName: string, sessionToken: string, isHost: boolean): Promise<Participant> {
   const id = uuidv4();
   const existing = await getParticipants(roomId);
-  const takenSides = existing.map((p) => p.side);
-  const side = !takenSides.includes('left') ? 'left' : 'right';
+  const room = await getRoomById(roomId);
+  const isSolo = room?.capacity === 1 || room?.settings?.mode === 'solo';
+  const isGroup = room?.settings?.mode === 'group';
+
+  let side: string;
+  if (isSolo) {
+    side = 'left';
+  } else if (isGroup) {
+    side = `p${existing.length + 1}`;
+  } else {
+    const takenSides = existing.map((p) => p.side);
+    side = !takenSides.includes('left') ? 'left' : 'right';
+  }
+
   await knex<ParticipantRow>('participants').insert({
     id,
     room_id: roomId,
@@ -146,7 +177,7 @@ export async function updateParticipantConnection(participantId: string, status:
 
 // ─── Photo ─────────────────────────────────────────────────────────────────
 
-export async function savePhoto(roomId: string, participantId: string, side: 'left' | 'right', slotIndex: number, storageKey: string, filters: string[] = []): Promise<Photo> {
+export async function savePhoto(roomId: string, participantId: string, side: string, slotIndex: number, storageKey: string, filters: string[] = []): Promise<Photo> {
   const id = uuidv4();
   await knex<PhotoRow>('photos').insert({
     id,
@@ -199,41 +230,44 @@ export async function getPairedShots(roomId: string, baseUrl: string): Promise<P
   const photos = await getAllPhotosForRoom(roomId);
   const room = await getRoomById(roomId);
   const isSolo = room?.capacity === 1 || room?.settings?.mode === 'solo';
-
-  const slotMap = new Map<number, { left?: Photo; right?: Photo }>();
-  for (const p of photos) {
-    const slot = slotMap.get(p.slotIndex) ?? {};
-    if (p.side === 'left') slot.left = p; else slot.right = p;
-    slotMap.set(p.slotIndex, slot);
-  }
   const participants = await getParticipants(roomId);
+
+  const slotMap = new Map<number, Photo[]>();
+  for (const p of photos) {
+    if (!slotMap.has(p.slotIndex)) slotMap.set(p.slotIndex, []);
+    slotMap.get(p.slotIndex)!.push(p);
+  }
+
   const result: PairedShot[] = [];
-  slotMap.forEach((slot, slotIndex) => {
-    if (isSolo && (slot.left || slot.right)) {
-      const singleP = slot.left || slot.right;
-      if (singleP) {
-        const keptBy = singleP.keptByParticipantIds;
-        const allKept = participants.every((p) => keptBy.includes(p.id));
-        result.push({
-          slotIndex,
-          leftPhotoUrl: `${baseUrl}/uploads/${singleP.storageKey}`,
-          rightPhotoUrl: `${baseUrl}/uploads/${singleP.storageKey}`,
-          keptByParticipantIds: keptBy,
-          status: allKept ? 'locked' : 'previewing',
-        });
-      }
-    } else if (slot.left && slot.right) {
-      const keptBy = slot.left.keptByParticipantIds;
-      const allKept = participants.every((p) => keptBy.includes(p.id));
-      result.push({
-        slotIndex,
-        leftPhotoUrl: `${baseUrl}/uploads/${slot.left.storageKey}`,
-        rightPhotoUrl: `${baseUrl}/uploads/${slot.right.storageKey}`,
-        keptByParticipantIds: keptBy,
-        status: allKept ? 'locked' : 'previewing',
-      });
-    }
+  slotMap.forEach((slotPhotos, slotIndex) => {
+    const leftPhoto = slotPhotos.find((p) => p.side === 'left') || slotPhotos[0];
+    const rightPhoto = slotPhotos.find((p) => p.side === 'right') || slotPhotos[1] || leftPhoto;
+
+    const participantPhotos = slotPhotos.map((p) => {
+      const foundParticipant = participants.find((part) => part.id === p.participantId);
+      return {
+        participantId: p.participantId,
+        side: p.side,
+        url: `${baseUrl}/uploads/${p.storageKey}`,
+        displayName: foundParticipant?.displayName || p.side,
+      };
+    });
+
+    const allKeptIds = Array.from(new Set(slotPhotos.flatMap((p) => p.keptByParticipantIds)));
+    const activeParticipants = participants.filter((p) => p.connectionStatus === 'connected');
+    const target = activeParticipants.length > 0 ? activeParticipants : participants;
+    const allKept = target.length > 0 && target.every((p) => allKeptIds.includes(p.id));
+
+    result.push({
+      slotIndex,
+      leftPhotoUrl: leftPhoto ? `${baseUrl}/uploads/${leftPhoto.storageKey}` : '',
+      rightPhotoUrl: rightPhoto ? `${baseUrl}/uploads/${rightPhoto.storageKey}` : '',
+      keptByParticipantIds: allKeptIds,
+      status: allKept ? 'locked' : 'previewing',
+      photos: participantPhotos,
+    });
   });
+
   return result.sort((a, b) => a.slotIndex - b.slotIndex);
 }
 
@@ -299,6 +333,35 @@ export async function getFrameTemplateById(id: string): Promise<FrameTemplate> {
     };
   }
 
+  const fromDb = await knex('frame_templates').where('id', id).first();
+  if (fromDb) {
+    let cutoutBoxes = [];
+    try {
+      if (fromDb.cutout_boxes_json) {
+        cutoutBoxes = JSON.parse(fromDb.cutout_boxes_json);
+      }
+    } catch (_) {}
+
+    return {
+      id: fromDb.id,
+      name: fromDb.name,
+      layoutType: fromDb.layout_type,
+      layout_type: fromDb.layout_type,
+      category: fromDb.category || 'custom',
+      description: fromDb.description || 'Frame kustom',
+      accentColor: fromDb.accent_color,
+      accent_color: fromDb.accent_color,
+      thumbnailGradient: fromDb.thumbnail_gradient,
+      thumbnail_gradient: fromDb.thumbnail_gradient,
+      overlayUrl: fromDb.overlay_key || undefined,
+      overlay_url: fromDb.overlay_key || undefined,
+      frameWidth: fromDb.frame_width || undefined,
+      frameHeight: fromDb.frame_height || undefined,
+      cutoutBoxes,
+      isCustom: Boolean(fromDb.is_custom),
+    };
+  }
+
   // Fallback to first available generated frame
   if (generatedFrames.length > 0) {
     const first = generatedFrames[0];
@@ -318,24 +381,6 @@ export async function getFrameTemplateById(id: string): Promise<FrameTemplate> {
       frameWidth: first.frameWidth,
       frameHeight: first.frameHeight,
       cutoutBoxes: first.cutoutBoxes,
-    };
-  }
-
-  const fromDb = await knex('frame_templates').where('id', id).first();
-  if (fromDb) {
-    return {
-      id: fromDb.id,
-      name: fromDb.name,
-      layoutType: fromDb.layout_type,
-      layout_type: fromDb.layout_type,
-      category: fromDb.category,
-      description: fromDb.description,
-      accentColor: fromDb.accent_color,
-      accent_color: fromDb.accent_color,
-      thumbnailGradient: fromDb.thumbnail_gradient,
-      thumbnail_gradient: fromDb.thumbnail_gradient,
-      overlayUrl: fromDb.overlay_url,
-      overlay_url: fromDb.overlay_url,
     };
   }
 
@@ -374,7 +419,39 @@ export async function getRender(roomId: string): Promise<FinalRenderRow | null> 
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 
 export async function cleanupExpiredRooms(): Promise<number> {
-  return knex<RoomRow>('rooms').where('expires_at', '<', Date.now()).whereNot('status', 'expired').update({ status: 'expired' });
+  const now = Date.now();
+  // Find all rooms where expires_at has passed
+  const expiredRooms = await knex<RoomRow>('rooms').where('expires_at', '<', now);
+  if (expiredRooms.length === 0) return 0;
+
+  const expiredIds = expiredRooms.map((r) => r.id);
+
+  // 1. Delete all raw uploaded photo files on disk
+  const photos = await knex<PhotoRow>('photos').whereIn('room_id', expiredIds);
+  for (const p of photos) {
+    if (p.storage_key) {
+      const filePath = path.join(UPLOADS_DIR, p.storage_key);
+      await fs.promises.unlink(filePath).catch(() => {});
+    }
+  }
+
+  // 2. Delete all final composite render files on disk
+  const renders = await knex<FinalRenderRow>('final_renders').whereIn('room_id', expiredIds);
+  for (const r of renders) {
+    if (r.output_key) {
+      const filePath = path.join(RENDERS_DIR, r.output_key);
+      await fs.promises.unlink(filePath).catch(() => {});
+    }
+  }
+
+  // 3. Delete database records
+  await knex('final_renders').whereIn('room_id', expiredIds).del();
+  await knex('votes').whereIn('room_id', expiredIds).del();
+  await knex('photos').whereIn('room_id', expiredIds).del();
+  await knex('participants').whereIn('room_id', expiredIds).del();
+  const deletedCount = await knex('rooms').whereIn('id', expiredIds).del();
+
+  return deletedCount;
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
@@ -391,6 +468,7 @@ function mapRoom(row: RoomRow): Room {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     completedAt: row.completed_at ?? undefined,
+    pin: row.pin ?? undefined,
   };
 }
 

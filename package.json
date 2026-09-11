@@ -10,6 +10,7 @@
     "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
     "dev:https": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev:https\"",
     "build": "npm --prefix server run build && npm --prefix client run build",
+    "start": "concurrently \"npm --prefix server start\" \"npm --prefix client start\"",
     "install:all": "npm install"
   },
 

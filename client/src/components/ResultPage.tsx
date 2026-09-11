@@ -6,8 +6,9 @@ import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room } from '@/types';
 import { FRAME_TEMPLATES } from '@/lib/frameTemplates';
 import { compositePreview } from '@/lib/composite';
-import { DownloadIcon, CopyIcon, CheckIcon, SparklesIcon, PlusIcon, HomeIcon, PaletteIcon, ArrowLeftIcon } from './Icons';
+import { DownloadIcon, CopyIcon, CheckIcon, PlusIcon, HomeIcon, PaletteIcon } from './Icons';
 import { getServerUrl } from '@/lib/config';
+import CreatorCard from './CreatorCard';
 
 interface ResultPageProps {
   room: Room;
@@ -57,7 +58,7 @@ export default function ResultPage({
       isSolo,
     )
       .then(() => setCompositing(false))
-      .catch((e) => {
+      .catch((e: unknown) => {
         console.error(e);
         setCompositing(false);
       });
@@ -120,7 +121,7 @@ export default function ResultPage({
       {/* Header Banner */}
       <div style={{ textAlign: 'center', width: '100%' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent-pink)', marginBottom: '4px' }}>
-          <SparklesIcon size={16} />
+          <CheckIcon size={16} />
           <span style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em' }}>HASIL PHOTO STRIP SELESAI</span>
         </div>
         <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Photobooth Strip Kamu Sudah Siap!</h1>
@@ -141,8 +142,8 @@ export default function ResultPage({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: '24px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '20px',
           width: '100%',
           alignItems: 'start',
         }}
@@ -272,6 +273,11 @@ export default function ResultPage({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Creator & Support Card */}
+      <div style={{ width: '100%', maxWidth: '680px', marginTop: '12px' }}>
+        <CreatorCard />
       </div>
     </div>
   );

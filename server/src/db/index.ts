@@ -9,12 +9,16 @@ if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
+interface SqliteConnection {
+  run: (sql: string, callback: (err: Error | null) => void) => void;
+}
+
 const knex = Knex({
   client: 'sqlite3',
   connection: { filename: DB_PATH },
   useNullAsDefault: true,
   pool: {
-    afterCreate: (conn: any, cb: any) => {
+    afterCreate: (conn: SqliteConnection, cb: (err: Error | null) => void) => {
       conn.run('PRAGMA journal_mode=WAL', cb);
     },
   },
@@ -34,7 +38,15 @@ export async function initDb(): Promise<void> {
       t.bigInteger('created_at').notNullable();
       t.bigInteger('expires_at').notNullable();
       t.bigInteger('completed_at').nullable();
+      t.string('pin', 8).nullable();
     });
+  } else {
+    // Migration: ensure pin column exists on existing databases
+    if (!(await knex.schema.hasColumn('rooms', 'pin'))) {
+      await knex.schema.table('rooms', (t) => {
+        t.string('pin', 8).nullable();
+      });
+    }
   }
 
   // Participants
@@ -93,6 +105,19 @@ export async function initDb(): Promise<void> {
       if (!exists) {
         await knex('frame_templates').insert(t);
       }
+    }
+  } else {
+    // Migration: ensure custom frame columns exist
+    if (!(await knex.schema.hasColumn('frame_templates', 'overlay_key'))) {
+      await knex.schema.table('frame_templates', (t) => {
+        t.string('overlay_key').nullable();
+        t.text('cutout_boxes_json').nullable();
+        t.integer('frame_width').nullable();
+        t.integer('frame_height').nullable();
+        t.string('category').nullable();
+        t.integer('is_custom').notNullable().defaultTo(0);
+        t.bigInteger('created_at').nullable();
+      });
     }
   }
 

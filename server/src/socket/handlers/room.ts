@@ -21,9 +21,10 @@ export async function broadcastRoomState(io: Server, roomId: string, baseUrl: st
 
   const votesMapped = mapVotes(votes);
   const downloadUrlPng = render ? `${baseUrl}/renders/${render.output_key}` : '';
+  const maskedRoom = { ...room, hasPin: Boolean(room.pin), pin: undefined };
 
   io.to(roomId).emit('room:state', {
-    room,
+    room: maskedRoom,
     participants,
     slots,
     votes: votesMapped,
@@ -34,9 +35,9 @@ export async function broadcastRoomState(io: Server, roomId: string, baseUrl: st
 }
 
 export function handleRoomJoin(io: Server, socket: AppSocket, baseUrl: string): void {
-  socket.on('room:join', async (payload: { roomCode: string; displayName: string; sessionToken?: string }) => {
+  socket.on('room:join', async (payload: { roomCode: string; displayName: string; sessionToken?: string; pin?: string }) => {
     try {
-      const { roomCode, displayName, sessionToken: existingToken } = payload;
+      const { roomCode, displayName, sessionToken: existingToken, pin } = payload;
       const room = await roomService.getRoomByCode(roomCode);
       if (!room) { socket.emit('error', { message: 'Room not found or expired', code: 'ROOM_NOT_FOUND' }); return; }
 
@@ -48,6 +49,15 @@ export function handleRoomJoin(io: Server, socket: AppSocket, baseUrl: string): 
         await roomService.updateParticipantConnection(participant.id, 'connected', socket.id);
         io.to(room.id).emit('participant:connectionChanged', { participantId: participant.id, connectionStatus: 'connected' });
       } else {
+        // Validate PIN if the room has one
+        if (room.pin) {
+          const providedPin = pin ? String(pin).trim().replace(/[^0-9]/g, '') : '';
+          if (providedPin !== room.pin) {
+            socket.emit('error', { message: 'PIN Room salah! Silakan masukkan PIN yang benar.', code: 'INVALID_PIN' });
+            return;
+          }
+        }
+
         const participants = await roomService.getParticipants(room.id);
         if (participants.length >= room.capacity) { socket.emit('error', { message: 'Room is full', code: 'ROOM_FULL' }); return; }
         newToken = uuidv4();
@@ -68,10 +78,11 @@ export function handleRoomJoin(io: Server, socket: AppSocket, baseUrl: string): 
 
       const votesMapped = mapVotes(votes);
       const downloadUrlPng = render ? `${baseUrl}/renders/${render.output_key}` : '';
+      const maskedRoom = updatedRoom ? { ...updatedRoom, hasPin: Boolean(updatedRoom.pin), pin: undefined } : updatedRoom;
 
       // Send personalized state to this socket
       socket.emit('room:state', {
-        room: updatedRoom,
+        room: maskedRoom,
         participants: allParticipants,
         slots,
         votes: votesMapped,
@@ -82,7 +93,7 @@ export function handleRoomJoin(io: Server, socket: AppSocket, baseUrl: string): 
 
       // Broadcast to other participants
       socket.to(room.id).emit('room:state', {
-        room: updatedRoom,
+        room: maskedRoom,
         participants: allParticipants,
         slots,
         votes: votesMapped,

@@ -3,6 +3,7 @@ import { handleRoomJoin, handleDisconnect } from './handlers/room';
 import { handleCaptureEvents } from './handlers/capture';
 import { handlePhotoSelectionEvents } from './handlers/photoSelection';
 import { handleVoteEvents } from './handlers/vote';
+import { handleChatEvents } from './handlers/chat';
 
 export function setupSocketIO(io: Server, baseUrl: string): void {
   io.on('connection', (socket) => {
@@ -12,6 +13,7 @@ export function setupSocketIO(io: Server, baseUrl: string): void {
     handleCaptureEvents(io, socket, baseUrl);
     handlePhotoSelectionEvents(io, socket, baseUrl);
     handleVoteEvents(io, socket, baseUrl);
+    handleChatEvents(io, socket);
     handleDisconnect(io, socket, baseUrl);
 
     socket.on('error', (err) => {

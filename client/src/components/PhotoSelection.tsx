@@ -9,8 +9,6 @@ import {
   CloseIcon,
   ClockIcon,
   LayoutIcon,
-  SparklesIcon,
-  PaletteIcon,
   RefreshCwIcon,
   MoveIcon,
   ArrowUpIcon,
@@ -21,6 +19,7 @@ import {
   ZoomOutIcon,
   SlidersIcon,
 } from './Icons';
+import { resolveMediaUrl } from '@/lib/config';
 
 interface PhotoSelectionProps {
   room: Room;
@@ -33,9 +32,9 @@ interface PhotoSelectionProps {
 }
 
 export interface IndividualPhoto {
-  id: string; // e.g. "0_left" or "0_right"
+  id: string; // e.g. "0_left" or "0_right" or "0_p1"
   slotIndex: number;
-  side: 'left' | 'right';
+  side: 'left' | 'right' | string;
   url: string;
   participantName: string;
   isMe: boolean;
@@ -85,20 +84,34 @@ export default function PhotoSelection({
   const me = participants.find((p) => p.id === myParticipantId);
   const partner = participants.find((p) => p.id !== myParticipantId);
 
-  const lockedSlots = slots.filter((s) => s.status === 'locked');
+  const availableSlots = slots.filter(
+    (s) => s.status === 'locked' || Boolean(s.leftPhotoUrl || s.rightPhotoUrl || (s.photos && s.photos.length > 0))
+  );
 
-  // Flatten all taken shots into individual photos (Left & Right separate for Duo; single list for Solo)
+  // Flatten all taken shots into individual photos (Left & Right separate for Duo; single list for Solo; all participant photos for Group)
   const allIndividualPhotos = useMemo<IndividualPhoto[]>(() => {
     const list: IndividualPhoto[] = [];
-    lockedSlots.forEach((slot) => {
-      if (isSolo) {
+    availableSlots.forEach((slot) => {
+      if (slot.photos && slot.photos.length > 0) {
+        slot.photos.forEach((sp, pIdx) => {
+          const participant = participants.find((p) => p.id === sp.participantId);
+          list.push({
+            id: `${slot.slotIndex}_${sp.participantId || sp.side || pIdx}`,
+            slotIndex: slot.slotIndex,
+            side: sp.side || 'left',
+            url: resolveMediaUrl(sp.url),
+            participantName: sp.displayName || participant?.displayName || `Peserta ${pIdx + 1}`,
+            isMe: sp.participantId === myParticipantId,
+          });
+        });
+      } else if (isSolo) {
         const photoUrl = slot.leftPhotoUrl || slot.rightPhotoUrl;
         if (photoUrl) {
           list.push({
             id: `${slot.slotIndex}_left`,
             slotIndex: slot.slotIndex,
             side: 'left',
-            url: photoUrl,
+            url: resolveMediaUrl(photoUrl),
             participantName: me?.displayName || 'Foto Saya',
             isMe: true,
           });
@@ -112,7 +125,7 @@ export default function PhotoSelection({
             id: `${slot.slotIndex}_left`,
             slotIndex: slot.slotIndex,
             side: 'left',
-            url: slot.leftPhotoUrl,
+            url: resolveMediaUrl(slot.leftPhotoUrl),
             participantName: leftP?.displayName || 'Person 1',
             isMe: leftP?.id === myParticipantId,
           });
@@ -122,7 +135,7 @@ export default function PhotoSelection({
             id: `${slot.slotIndex}_right`,
             slotIndex: slot.slotIndex,
             side: 'right',
-            url: slot.rightPhotoUrl,
+            url: resolveMediaUrl(slot.rightPhotoUrl),
             participantName: rightP?.displayName || 'Person 2',
             isMe: rightP?.id === myParticipantId,
           });
@@ -130,7 +143,7 @@ export default function PhotoSelection({
       }
     });
     return list;
-  }, [lockedSlots, participants, myParticipantId, isSolo, me?.displayName]);
+  }, [availableSlots, participants, myParticipantId, isSolo, me?.displayName]);
 
   // Ensure slot assignments size matches totalSlots when template changes
   useEffect(() => {
@@ -143,13 +156,63 @@ export default function PhotoSelection({
     });
   }, [totalSlots]);
 
+  // Automatically fill empty slots with captured photos so mobile users never see blank placeholders
+  useEffect(() => {
+    if (allIndividualPhotos.length === 0 || totalSlots === 0) return;
+
+    setSlotAssignments((prev) => {
+      const hasAnyAssigned = prev.some((x) => x !== null && x !== undefined && x !== '');
+      if (hasAnyAssigned) return prev;
+
+      const next = Array(totalSlots).fill(null);
+      if (layout.isTwinStrip && layout.leftBoxes.length > 0 && layout.rightBoxes.length > 0) {
+        const leftPhotos = allIndividualPhotos.filter((p) => p.side === 'left');
+        const rightPhotos = allIndividualPhotos.filter((p) => p.side === 'right');
+        const leftBoxCount = layout.leftBoxes.length;
+
+        layout.leftBoxes.forEach((_, idx) => {
+          if (leftPhotos[idx]) {
+            next[idx] = leftPhotos[idx].id;
+          } else if (allIndividualPhotos[idx]) {
+            next[idx] = allIndividualPhotos[idx].id;
+          }
+        });
+
+        layout.rightBoxes.forEach((_, idx) => {
+          const slotIdx = leftBoxCount + idx;
+          if (rightPhotos[idx]) {
+            next[slotIdx] = rightPhotos[idx].id;
+          } else if (allIndividualPhotos[idx]) {
+            next[slotIdx] = allIndividualPhotos[idx].id;
+          }
+        });
+      } else {
+        allIndividualPhotos.forEach((photo, idx) => {
+          if (idx < totalSlots) {
+            next[idx] = photo.id;
+          }
+        });
+      }
+
+      if (me?.isHost || isSolo) {
+        socket.emit('photoSelection:update', {
+          roomId: room.id,
+          selectedOrder: next,
+          photoOffsets: {},
+        });
+      }
+
+      return next;
+    });
+  }, [allIndividualPhotos, totalSlots, layout, me?.isHost, isSolo, room.id, socket]);
+
   // ─── Socket Sync ────────────────────────────────────────────────────────────
   useEffect(() => {
     const onSelectionUpdate = ({
       selectedOrder,
       photoOffsets: serverOffsets,
     }: {
-      selectedOrder: any;
+      selectedOrder: (number | string)[];
       photoOffsets?: Record<number, PhotoOffset>;
     }) => {
       if (Array.isArray(selectedOrder)) {
@@ -262,11 +325,34 @@ export default function PhotoSelection({
 
   function handleAutoFill() {
     const next = Array(totalSlots).fill(null);
-    allIndividualPhotos.forEach((photo, idx) => {
-      if (idx < totalSlots) {
-        next[idx] = photo.id;
-      }
-    });
+    if (layout.isTwinStrip && layout.leftBoxes.length > 0 && layout.rightBoxes.length > 0) {
+      const leftPhotos = allIndividualPhotos.filter((p) => p.side === 'left');
+      const rightPhotos = allIndividualPhotos.filter((p) => p.side === 'right');
+      const leftBoxCount = layout.leftBoxes.length;
+
+      layout.leftBoxes.forEach((_, idx) => {
+        if (leftPhotos[idx]) {
+          next[idx] = leftPhotos[idx].id;
+        } else if (allIndividualPhotos[idx]) {
+          next[idx] = allIndividualPhotos[idx].id;
+        }
+      });
+
+      layout.rightBoxes.forEach((_, idx) => {
+        const slotIdx = leftBoxCount + idx;
+        if (rightPhotos[idx]) {
+          next[slotIdx] = rightPhotos[idx].id;
+        } else if (allIndividualPhotos[idx]) {
+          next[slotIdx] = allIndividualPhotos[idx].id;
+        }
+      });
+    } else {
+      allIndividualPhotos.forEach((photo, idx) => {
+        if (idx < totalSlots) {
+          next[idx] = photo.id;
+        }
+      });
+    }
     emitUpdate(next);
   }
 
@@ -358,7 +444,7 @@ export default function PhotoSelection({
             <ArrowLeftIcon size={14} /> Kembali / Ganti Frame
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleAutoFill} id="auto-fill-btn" title="Otomatis isi semua slot berurutan">
-            <SparklesIcon size={14} /> Auto-Fill
+            <LayoutIcon size={14} /> Auto-Fill
           </button>
           {assignedCount > 0 && (
             <button className="btn btn-secondary btn-sm" onClick={handleClearAll} id="clear-all-btn">
@@ -782,12 +868,19 @@ export default function PhotoSelection({
                   <MoveIcon size={12} /> Bebas Dipilih Berkali-kali
                 </span>
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>
-                Drag foto ke slot di frame kiri atau klik untuk memasukkan. Satu foto bisa dipakai di lebih dari 1 slot sekaligus!
-              </p>
+              {activeSlotIndex !== null ? (
+                <div style={{ padding: '8px 12px', background: 'rgba(168,85,247,0.18)', border: '1px solid rgba(168,85,247,0.4)', borderRadius: 'var(--radius-sm)', color: '#e9d5ff', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                  <span>👉</span>
+                  <span><strong>Slot #{activeSlotIndex + 1} dipilih.</strong> Sentuh foto di bawah ini untuk memasukkannya ke Slot #{activeSlotIndex + 1}.</span>
+                </div>
+              ) : (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+                  Sentuh slot foto pada frame untuk mengatur posisi/zoom, atau sentuh foto di bawah untuk memasukkan ke slot frame.
+                </p>
+              )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))', gap: '12px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+            <div className="photo-pool-grid">
               {allIndividualPhotos.map((photo) => {
                 const placedSlots = slotAssignments
                   .map((id, idx) => (id === photo.id ? idx + 1 : null))
@@ -897,12 +990,12 @@ export default function PhotoSelection({
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-secondary btn-lg"
                   onClick={handleChangeTemplate}
                   id="bottom-back-to-frame-btn"
-                  style={{ flexShrink: 0, fontWeight: 700 }}
+                  style={{ fontWeight: 700 }}
                   title="Kembali ke pemilihan frame"
                 >
                   <ArrowLeftIcon size={16} /> Pilih Ulang Frame
@@ -913,7 +1006,7 @@ export default function PhotoSelection({
                   onClick={handleConfirm}
                   disabled={iConfirmed}
                   id="confirm-placement-btn"
-                  style={{ flex: 1, fontSize: '15px' }}
+                  style={{ flex: 1, minWidth: '220px', fontSize: '15px' }}
                 >
                   {iConfirmed ? (
                     <><span className="spinner" /> {isSolo ? 'Memproses & Merender HD…' : `Menunggu ${partner?.displayName || 'Partner'} Mengonfirmasi…`}</>

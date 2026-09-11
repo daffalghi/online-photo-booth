@@ -4,8 +4,68 @@ import { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room, RoundStatus } from '@/types';
 import { captureFrame, FilterType } from '@/lib/capture';
-import { getLocalStream, createPeerConnection, handleWebRTCSignal, setRemoteStreamCallback } from '@/lib/webrtc';
-import { CameraIcon, CheckIcon, RefreshCwIcon, PlusIcon, SparklesIcon, SlidersIcon, ClockIcon, ArrowRightIcon, UserIcon } from './Icons';
+import {
+  getLocalStream,
+  initiatePeerConnection,
+  handleWebRTCSignal,
+  subscribeRemoteStreams,
+  toggleMic,
+  isMicEnabled,
+} from '@/lib/webrtc';
+import { CameraIcon, CheckIcon, RefreshCwIcon, PlusIcon, SlidersIcon, ClockIcon, ArrowRightIcon, UserIcon, MicIcon, MicOffIcon, CrownIcon } from './Icons';
+import { useLanguage } from '@/lib/i18n';
+
+function RemoteVideoTile({
+  stream,
+  previewUrl,
+  showPreview,
+  displayName,
+  isHost,
+}: {
+  stream?: MediaStream;
+  previewUrl?: string;
+  showPreview: boolean;
+  displayName: string;
+  isHost: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [stream]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '160px', overflow: 'hidden', background: '#0b0c13', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {showPreview && previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={previewUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : stream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          onLoadedMetadata={(e) => e.currentTarget.play().catch(() => {})}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+        />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '12px', textAlign: 'center' }}>
+          <span className="spinner" style={{ width: '20px', height: '20px' }} />
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Menghubungkan {displayName}…</span>
+        </div>
+      )}
+
+      <div style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 10 }}>
+        <span className="badge badge-neutral" style={{ fontSize: '10.5px', backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.6)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          {isHost && <CrownIcon size={11} color="var(--accent-amber)" />}
+          {displayName}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 const MAX_SHOTS = 10;
 
@@ -34,6 +94,7 @@ interface CapturePhaseProps {
 }
 
 export default function CapturePhase({ room, participants, myParticipantId, slots, socket }: CapturePhaseProps) {
+  const { t } = useLanguage();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [filter, setFilter] = useState<FilterType>('none');
@@ -47,15 +108,27 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const [finishedParticipantIds, setFinishedParticipantIds] = useState<string[]>([]);
   const [camError, setCamError] = useState('');
   const [remoteConnected, setRemoteConnected] = useState(false);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [cameraAspect, setCameraAspect] = useState<string>('16/9');
+  const [micOn, setMicOn] = useState(true);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const captureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSolo = room.capacity === 1 || room.settings?.mode === 'solo';
+  const isGroup = room.settings?.mode === 'group' || room.capacity > 2;
   const me = participants.find((p) => p.id === myParticipantId);
   const partner = participants.find((p) => p.id !== myParticipantId);
+  const partnerStream = partner ? remoteStreams.get(partner.id) : Array.from(remoteStreams.values())[0];
   const slotIndex = room.currentRoundIndex;
   const roundStatus: RoundStatus = room.currentRoundStatus;
+
+  // Bind remote stream to remoteVideoRef in Duo mode
+  useEffect(() => {
+    if (remoteVideoRef.current && partnerStream) {
+      remoteVideoRef.current.srcObject = partnerStream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [partnerStream, me?.side, roundStatus]);
 
   const lockedSlots = slots.filter((s) => s.status === 'locked');
   const currentSlot = slots.find((s) => s.slotIndex === slotIndex);
@@ -77,6 +150,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       .then((stream) => {
         if (!mounted || !localVideoRef.current) return;
         localVideoRef.current.srcObject = stream;
+        setMicOn(isMicEnabled());
         const track = stream.getVideoTracks()[0];
         if (track) {
           const settings = track.getSettings();
@@ -95,30 +169,49 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     return () => { mounted = false; };
   }, []);
 
-  // ─── WebRTC (Only needed for Duo mode) ──────────────────────────────────────
+  // ─── WebRTC (Multi-Peer Mesh for Duo and Group mode) ───────────────────────
   useEffect(() => {
     if (isSolo) return;
 
-    const isInitiator = me?.side === 'left';
-
-    setRemoteStreamCallback((stream) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-        setRemoteConnected(true);
-      }
+    const unsubscribe = subscribeRemoteStreams((streams) => {
+      setRemoteStreams(new Map(streams));
+      if (streams.size > 0) setRemoteConnected(true);
     });
 
     getLocalStream().then((stream) => {
-      if (stream) createPeerConnection(room.id, myParticipantId, isInitiator);
+      if (stream) {
+        participants.forEach((p) => {
+          if (p.id !== myParticipantId) {
+            // Deterministic initiator (lower ID initiates)
+            if (myParticipantId < p.id) {
+              initiatePeerConnection(room.id, myParticipantId, p.id);
+            }
+          }
+        });
+      }
     }).catch(console.error);
 
-    const handleSignal = ({ signal, fromParticipantId }: { signal: RTCSessionDescriptionInit | RTCIceCandidateInit; fromParticipantId: string }) => {
-      if (fromParticipantId !== myParticipantId) handleWebRTCSignal(room.id, myParticipantId, signal);
+    const handleSignal = ({
+      signal,
+      fromParticipantId,
+      targetParticipantId,
+    }: {
+      signal: RTCSessionDescriptionInit | RTCIceCandidateInit;
+      fromParticipantId: string;
+      targetParticipantId?: string;
+    }) => {
+      if (fromParticipantId !== myParticipantId) {
+        handleWebRTCSignal(room.id, myParticipantId, signal, fromParticipantId, targetParticipantId);
+      }
     };
+
     socket.on('webrtc:signal', handleSignal);
-    return () => { socket.off('webrtc:signal', handleSignal); };
+    return () => {
+      socket.off('webrtc:signal', handleSignal);
+      unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSolo]);
+  }, [isSolo, participants.length]);
 
   // ─── Socket Events ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -249,7 +342,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     socket.emit('capture:finish', { roomId: room.id });
   }
 
-  const showPreview = roundStatus === 'previewing' && (currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl);
+  const showPreview = Boolean(roundStatus === 'previewing' && (currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl || (currentSlot?.photos && currentSlot.photos.length > 0)));
   const previewUrl = currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl;
   const showPostKeep = roundStatus === 'locked';
 
@@ -262,26 +355,50 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <CameraIcon size={18} color="var(--accent-pink)" />
           <span style={{ fontWeight: 800, fontSize: '15px' }}>
-            {isSolo ? `Foto Solo #${slotIndex + 1}` : `Pengambilan Foto #${slotIndex + 1}`}
+            {isSolo ? t('captureShotSoloNum', { num: slotIndex + 1 }) : t('captureShotNum', { num: slotIndex + 1 })}
           </span>
           <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
-            {lockedSlots.length}/{MAX_SHOTS} Tersimpan
+            {t('capturePhotosSaved', { count: lockedSlots.length, max: MAX_SHOTS })}
           </span>
         </div>
 
-        {/* Status indicator */}
-        <div>
+        {/* Actions & Status indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {!isSolo && (
+            <button
+              className={`btn btn-sm ${micOn ? 'btn-secondary' : 'btn-danger'}`}
+              onClick={async () => {
+                const nextState = await toggleMic();
+                setMicOn(nextState);
+              }}
+              id="mic-toggle-btn"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                borderRadius: 'var(--radius-full)',
+                fontWeight: 600,
+              }}
+              title={micOn ? 'Mute Microphone' : 'Unmute Microphone'}
+            >
+              {micOn ? <MicIcon size={13} color="var(--accent-emerald)" /> : <MicOffIcon size={13} color="#f87171" />}
+              <span>{micOn ? t('micOn') : t('micOff')}</span>
+            </button>
+          )}
+
           {roundStatus === 'waiting_ready' && (
-            <span className="badge badge-violet"><ClockIcon size={12} /> Siap Mengambil Foto</span>
+            <span className="badge badge-violet"><ClockIcon size={12} /> {t('captureReadyBadge')}</span>
           )}
           {roundStatus === 'counting_down' && (
-            <span className="badge badge-pink"><SparklesIcon size={12} /> Senyum! Hitungan Mundur…</span>
+            <span className="badge badge-pink"><CameraIcon size={12} /> {t('captureSmileCountdown')}</span>
           )}
           {roundStatus === 'previewing' && (
-            <span className="badge badge-neutral">Review Hasil Foto</span>
+            <span className="badge badge-neutral">{t('captureReviewBadge')}</span>
           )}
           {roundStatus === 'locked' && (
-            <span className="badge badge-green"><CheckIcon size={12} /> Foto Tersimpan!</span>
+            <span className="badge badge-green"><CheckIcon size={12} /> {t('captureSavedBadge')}</span>
           )}
         </div>
       </div>
@@ -292,13 +409,14 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         </div>
       )}
 
-      {/* Camera Viewfinder Box: Single Viewfinder for Solo, Dual Viewfinder for Duo */}
+      {/* Camera Viewfinder Box: Single for Solo, Grid for Group, Dual for Duo */}
       {isSolo ? (
         // ─── SOLO CAMERA VIEW (Centered single camera) ──────────────────────────
         <div
           style={{
             width: '100%',
             maxWidth: '640px',
+            maxHeight: '52dvh',
             aspectRatio: cameraAspect,
             borderRadius: 'var(--radius-lg)',
             overflow: 'hidden',
@@ -320,6 +438,8 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
               objectFit: 'cover',
               filter: FILTER_CSS[filter],
               display: showPreview ? 'none' : 'block',
+              transform: 'scaleX(-1) translateZ(0)',
+              backfaceVisibility: 'hidden',
             }}
           />
           {showPreview && previewUrl && (
@@ -343,23 +463,86 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
             </div>
           )}
         </div>
-      ) : (
-        // ─── DUO CAMERA VIEW (Split Dual Camera) ────────────────────────────────
+      ) : isGroup ? (
+        // ─── GROUP CAMERA VIEW (Multi-camera grid for up to 6 participants) ─────
         <div
+          className="camera-view-group"
           style={{
-            width: '100%',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            background: '#090a10',
-            border: '1px solid var(--border-subtle)',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.6)',
-            aspectRatio: '16/10',
-            maxHeight: '480px',
-            position: 'relative',
+            gridTemplateColumns: participants.length <= 2 ? '1fr 1fr' : participants.length <= 4 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
           }}
         >
+          {participants.map((p) => {
+            const isMe = p.id === myParticipantId;
+            const pPhoto = currentSlot?.photos?.find((sp) => sp.participantId === p.id)?.url || (p.side === 'left' ? currentSlot?.leftPhotoUrl : currentSlot?.rightPhotoUrl);
+
+            return (
+              <div
+                key={p.id}
+                style={{
+                  position: 'relative',
+                  aspectRatio: '4/3',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  background: '#10121b',
+                  border: isMe ? '1.5px solid rgba(255,94,151,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                {isMe ? (
+                  <>
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      onLoadedMetadata={handleVideoMetadata}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        filter: FILTER_CSS[filter],
+                        display: showPreview ? 'none' : 'block',
+                        transform: 'scaleX(-1) translateZ(0)',
+                        backfaceVisibility: 'hidden',
+                      }}
+                    />
+                    {showPreview && pPhoto && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={pPhoto} alt={p.displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )}
+                  </>
+                ) : (
+                  <RemoteVideoTile
+                    stream={remoteStreams.get(p.id)}
+                    previewUrl={pPhoto}
+                    showPreview={showPreview}
+                    displayName={p.displayName}
+                    isHost={p.isHost}
+                  />
+                )}
+
+                {/* Name Badge */}
+                <div style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 10 }}>
+                  <span className={`badge ${isMe ? 'badge-pink' : 'badge-neutral'}`} style={{ fontSize: '10.5px', backdropFilter: 'blur(8px)', background: isMe ? 'rgba(255,94,151,0.35)' : 'rgba(0,0,0,0.65)' }}>
+                    {p.isHost && <CrownIcon size={11} color="var(--accent-amber)" />}
+                    {p.displayName} {isMe && '(Kamu)'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Countdown Overlay over the entire group grid */}
+          {countdown !== null && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 30, borderRadius: 'var(--radius-lg)' }}>
+              <div key={countdownKey} className="countdown-number" style={{ fontSize: '96px', fontWeight: 900, color: 'white', textShadow: '0 0 40px rgba(255,94,151,0.95)' }}>
+                {countdown}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        // ─── DUO CAMERA VIEW (Split Dual Camera) ────────────────────────────────
+        <div className="camera-view-duo">
           {/* Left panel */}
           <div style={{ position: 'relative', height: '100%', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
             {me?.side === 'left' ? (
@@ -369,7 +552,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
                 {showPreview && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -382,9 +565,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   ref={remoteVideoRef}
                   autoPlay
                   playsInline
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: showPreview ? 'none' : 'block' }}
+                  onLoadedMetadata={(e) => e.currentTarget.play().catch(() => {})}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: showPreview ? 'none' : 'block', transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
-                {!remoteConnected && !showPreview && (
+                {!partnerStream && !showPreview && (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,18,0.85)', gap: '8px', padding: '16px', textAlign: 'center' }}>
                     <span className="spinner" />
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Menghubungkan ke partner…</span>
@@ -423,7 +607,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
                 {showPreview && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -436,9 +620,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   ref={remoteVideoRef}
                   autoPlay
                   playsInline
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: showPreview ? 'none' : 'block' }}
+                  onLoadedMetadata={(e) => e.currentTarget.play().catch(() => {})}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: showPreview ? 'none' : 'block', transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
-                {!remoteConnected && !showPreview && (
+                {!partnerStream && !showPreview && (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,18,0.85)', gap: '8px', padding: '16px', textAlign: 'center' }}>
                     <span className="spinner" />
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Menghubungkan ke partner…</span>
@@ -509,7 +694,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                 {iAmReady ? (
                   <><span className="spinner" /> {isSolo ? 'Menyiapkan…' : `Menunggu ${partner?.displayName || 'Partner'}…`}</>
                 ) : (
-                  <><CameraIcon size={18} /> Ambil Foto</>
+                  <><CameraIcon size={18} /> {t('captureTakePhotoBtn')}</>
                 )}
               </button>
 
@@ -541,7 +726,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
                 <button className="btn btn-secondary btn-lg" onClick={handleRetake} id="retake-btn">
-                  <RefreshCwIcon size={16} /> Foto Ulang (Retake)
+                  <RefreshCwIcon size={16} /> {t('captureRetakeBtn')}
                 </button>
                 <button
                   className="btn btn-primary btn-lg"
@@ -551,9 +736,9 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   style={{ flex: 1, maxWidth: '260px' }}
                 >
                   {iHaveKept ? (
-                    <><span className="spinner" /> {isSolo ? 'Menyimpan…' : 'Menunggu Partner…'}</>
+                    <><span className="spinner" /> {isSolo ? 'Menyimpan…' : t('captureWaitingPartner')}</>
                   ) : (
-                    <><CheckIcon size={16} /> Simpan Foto Ini</>
+                    <><CheckIcon size={16} /> {t('captureKeepBtn')}</>
                   )}
                 </button>
               </div>
@@ -588,7 +773,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     id="take-another-btn"
                     style={{ flex: 1, maxWidth: '240px' }}
                   >
-                    <PlusIcon size={16} /> Ambil Foto Lagi
+                    <PlusIcon size={16} /> {t('captureNextShotBtn')}
                   </button>
                 )}
 

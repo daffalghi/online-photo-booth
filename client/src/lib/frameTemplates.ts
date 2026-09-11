@@ -39,13 +39,50 @@ export interface CanvasLayoutConfig {
   gap?: number;
 }
 
+export async function fetchAllFrameTemplates(): Promise<ExtendedFrameTemplate[]> {
+  try {
+    const res = await fetch('/api/frames');
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.frames && Array.isArray(data.frames) && data.frames.length > 0) {
+        return data.frames as ExtendedFrameTemplate[];
+      }
+    }
+  } catch (err) {
+    console.warn('[FrameTemplates] Failed to fetch remote frames, using local built-ins:', err);
+  }
+  return FRAME_TEMPLATES;
+}
+
 export function getCanvasLayout(template: ExtendedFrameTemplate, isSolo = false): CanvasLayoutConfig {
-  const overlayUrl = template.overlay_url;
-  const cat = template.category || (template.layout_type.includes('1x3') ? '1x3' : template.layout_type.includes('1x4') ? '1x4' : template.layout_type.includes('2x3') ? '2x3' : '2x2');
+  const overlayUrl = template.overlay_url || template.overlayUrl;
+  const cat = template.category || (template.layout_type?.includes('1x3') ? '1x3' : template.layout_type?.includes('1x4') ? '1x4' : template.layout_type?.includes('2x3') ? '2x3' : '2x2');
   
   const fW = template.frameWidth || (cat === '1x3' || cat === '1x4' ? 600 : cat === '2x3' ? 1120 : 1180);
   const fH = template.frameHeight || (cat === '1x3' || cat === '1x4' ? 1800 : cat === '2x3' ? 1368 : 1750);
   const boxes = (template.cutoutBoxes && template.cutoutBoxes.length > 0) ? template.cutoutBoxes : [];
+
+  // Custom user-uploaded frames with detected cutout holes
+  if (cat === 'custom' || template.id.startsWith('custom_')) {
+    const leftBoxes: FrameBox[] = boxes.map((b) => ({
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+    }));
+
+    return {
+      width: fW,
+      height: fH,
+      leftBoxes,
+      rightBoxes: [],
+      overlayUrl,
+      isTwinStrip: false,
+      singleStripWidth: fW,
+      singleStripHeight: fH,
+      gap: 0,
+    };
+  }
 
   // ── 0. 1x3 (3-Cut Strip: Single Strip for Solo, Twin Strip for Duo) ──────────
   if (cat === '1x3' || template.layout_type === '1x3') {
@@ -219,7 +256,7 @@ export function getCanvasLayout(template: ExtendedFrameTemplate, isSolo = false)
 
 export function resolveOrderedPhotoUrls(
   slots: PairedShot[],
-  selectedOrder?: any[],
+  selectedOrder?: (number | string)[],
 ): { leftUrls: string[]; rightUrls: string[]; allUrls: string[] } {
   const leftUrls: string[] = [];
   const rightUrls: string[] = [];
@@ -275,7 +312,7 @@ export async function compositePreview(
   template: ExtendedFrameTemplate,
   captionText: string,
   accentColor: string,
-  selectedOrder?: any[],
+  selectedOrder?: (number | string)[],
   photoOffsets?: Record<number | string, { x?: number; y?: number; scale?: number }>,
   isSolo = false,
 ): Promise<void> {

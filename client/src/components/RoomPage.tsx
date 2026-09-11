@@ -14,8 +14,12 @@ import PhotoSelection from './PhotoSelection';
 import FrameSelection from './FrameSelection';
 import ResultPage from './ResultPage';
 import StepHeader from './StepHeader';
-import { CameraIcon, UserIcon, ArrowRightIcon, InfoIcon, HomeIcon } from './Icons';
-import { resolveMediaUrl } from '@/lib/config';
+import RoomChat from './RoomChat';
+import { CameraIcon, UserIcon, InfoIcon, HomeIcon, LockIcon } from './Icons';
+import { resolveMediaUrl, getServerUrl } from '@/lib/config';
+import { useLanguage } from '@/lib/i18n';
+import LanguageSwitcher from './LanguageSwitcher';
+import ConnectionBanner from './ConnectionBanner';
 
 interface RoomPageProps {
   code: string;
@@ -25,6 +29,7 @@ type AppPhase = 'loading' | 'name_entry' | 'lobby' | 'capturing' | 'photo_select
 
 export default function RoomPage({ code }: RoomPageProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<AppPhase>('loading');
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -33,29 +38,35 @@ export default function RoomPage({ code }: RoomPageProps) {
   const [sessionToken, setSessionToken] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [nameInput, setNameInput] = useState('');
+  const [hasPin, setHasPin] = useState(false);
+  const [pinInput, setPinInput] = useState('');
   const [votes, setVotes] = useState<VoteStatus[]>([]);
   const [downloadUrlPng, setDownloadUrlPng] = useState('');
   const [lockedFrameId, setLockedFrameId] = useState('');
   const [lockedCustomization, setLockedCustomization] = useState<{ accentColor?: string; captionText?: string }>({});
   const [error, setError] = useState('');
+  const [takingLong, setTakingLong] = useState(false);
   const joinedRef = useRef(false);
 
-  // Initialize socket connection
+  // Monitor loading timeout
   useEffect(() => {
+    if (phase !== 'loading') {
+      setTakingLong(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setTakingLong(true);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  // Unified Room Init & Socket Connection
+  useEffect(() => {
+    let active = true;
     const socket = connectSocket();
 
-    socket.on('connect', () => {
-      const token = localStorage.getItem(`token_${code}`);
-      const name = localStorage.getItem(`name_${code}`);
-      if (name && !joinedRef.current) {
-        joinedRef.current = true;
-        socket.emit('room:join', { roomCode: code, displayName: name, sessionToken: token || undefined });
-      }
-    });
-
-
-    socket.on('room:state', (payload: RoomStatePayload) => {
-      if (!payload.room) return;
+    const onRoomState = (payload: RoomStatePayload) => {
+      if (!active || !payload.room) return;
       setRoom(payload.room);
       setParticipants(payload.participants);
 
@@ -63,6 +74,10 @@ export default function RoomPage({ code }: RoomPageProps) {
         ...s,
         leftPhotoUrl: resolveMediaUrl(s.leftPhotoUrl),
         rightPhotoUrl: resolveMediaUrl(s.rightPhotoUrl),
+        photos: (s.photos || []).map((p) => ({
+          ...p,
+          url: resolveMediaUrl(p.url),
+        })),
       }));
       setSlots(normalizedSlots);
 
@@ -96,36 +111,94 @@ export default function RoomPage({ code }: RoomPageProps) {
       else if (status === 'frame_selection') setPhase('frame_selection');
       else if (status === 'rendering') setPhase('rendering');
       else if (status === 'completed') setPhase('completed');
-    });
+    };
 
+    const onError = ({ message, code: errCode }: { message: string; code?: string }) => {
+      if (!active) return;
+      setError(message);
+      if (errCode === 'INVALID_PIN') {
+        joinedRef.current = false;
+        setPhase('name_entry');
+      } else if (errCode === 'ROOM_NOT_FOUND' || errCode === 'ROOM_FULL') {
+        setPhase('error');
+      }
+    };
+
+    socket.on('room:state', onRoomState);
     socket.on('frame:voteStatus', (payload: VoteStatusPayload) => {
-      setVotes(payload.votes);
+      if (active) setVotes(payload.votes);
     });
-
     socket.on('frame:locked', (payload: FrameLockedPayload) => {
+      if (!active) return;
       setLockedFrameId(payload.frameTemplateId);
       setLockedCustomization(payload.customization);
       setPhase('photo_selection');
     });
-
     socket.on('render:ready', (payload: RenderReadyPayload) => {
+      if (!active) return;
       setDownloadUrlPng(resolveMediaUrl(payload.downloadUrlPng));
       setPhase('completed');
     });
+    socket.on('error', onError);
 
+    async function initRoomAndJoin() {
+      try {
+        const res = await fetch(`${getServerUrl()}/api/rooms/${code}`);
+        if (!active) return;
 
-    socket.on('error', ({ message }: { message: string }) => {
-      setError(message);
-    });
+        if (!res.ok) {
+          setError(`Room "${code}" tidak ditemukan atau masa berlakunya telah berakhir.`);
+          setPhase('error');
+          return;
+        }
+
+        const data = await res.json();
+        const roomRequiresPin = Boolean(data.room?.hasPin);
+        if (roomRequiresPin) {
+          setHasPin(true);
+        }
+
+        const existingToken = localStorage.getItem(`token_${code}`);
+        const existingName = localStorage.getItem(`name_${code}`);
+        const existingPin = localStorage.getItem(`pin_${code}`) || '';
+
+        // If we already have the name and valid PIN if required:
+        if (existingName && (!roomRequiresPin || existingPin.trim().length >= 4)) {
+          setDisplayName(existingName);
+          setNameInput(existingName);
+          if (existingPin) setPinInput(existingPin);
+
+          const emitJoin = () => {
+            if (!active) return;
+            joinedRef.current = true;
+            socket.emit('room:join', {
+              roomCode: code,
+              displayName: existingName,
+              sessionToken: existingToken || undefined,
+              pin: existingPin.trim() || undefined,
+            });
+          };
+
+          if (socket.connected) {
+            emitJoin();
+          } else {
+            socket.once('connect', emitJoin);
+          }
+        } else {
+          setPhase('name_entry');
+        }
+      } catch (err) {
+        console.error('Room init error:', err);
+        if (active) setPhase('name_entry');
+      }
+    }
+
+    initRoomAndJoin();
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('room:state');
-      socket.off('frame:voteStatus');
-      socket.off('frame:locked');
-      socket.off('render:ready');
-      socket.off('error');
+      active = false;
+      socket.off('room:state', onRoomState);
+      socket.off('error', onError);
       disconnectSocket();
       stopLocalStream();
       closePeerConnection();
@@ -133,24 +206,24 @@ export default function RoomPage({ code }: RoomPageProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // Returning user check
-  useEffect(() => {
-    const existingToken = localStorage.getItem(`token_${code}`);
-    const existingName = localStorage.getItem(`name_${code}`);
-    if (existingToken && existingName) {
-      setDisplayName(existingName);
-      setNameInput(existingName);
-    } else {
-      setPhase('name_entry');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   function handleJoin() {
     const name = nameInput.trim();
-    if (!name) { setError('Please enter your name'); return; }
+    if (!name) { setError(t('nameRequiredError')); return; }
+    
+    let cleanedPin = '';
+    if (hasPin) {
+      cleanedPin = pinInput.trim().replace(/[^0-9]/g, '');
+      if (cleanedPin.length < 4 || cleanedPin.length > 6) {
+        setError(t('pinDigitRule'));
+        return;
+      }
+    }
+
     setDisplayName(name);
     localStorage.setItem(`name_${code}`, name);
+    if (cleanedPin) {
+      localStorage.setItem(`pin_${code}`, cleanedPin);
+    }
     setError('');
     setPhase('loading');
 
@@ -159,7 +232,12 @@ export default function RoomPage({ code }: RoomPageProps) {
 
     const emitJoin = () => {
       joinedRef.current = true;
-      socket.emit('room:join', { roomCode: code, displayName: name, sessionToken: token });
+      socket.emit('room:join', {
+        roomCode: code,
+        displayName: name,
+        sessionToken: token,
+        pin: cleanedPin || undefined,
+      });
     };
 
     if (socket.connected) {
@@ -185,7 +263,11 @@ export default function RoomPage({ code }: RoomPageProps) {
   // ─── Render Phases ────────────────────────────────────────────────────
   if (phase === 'name_entry') {
     return (
-      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', position: 'relative' }}>
+        <ConnectionBanner />
+        <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10 }}>
+          <LanguageSwitcher />
+        </div>
         <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -197,7 +279,7 @@ export default function RoomPage({ code }: RoomPageProps) {
               <UserIcon size={24} />
             </div>
             <h1 style={{ fontSize: '26px', fontWeight: 800 }}>
-              Masuk Photobooth
+              {t('nameEntryTitle')}
             </h1>
             <p style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '13px' }}>
               Kode Room: <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--accent-pink)', fontSize: '16px' }}>{code}</span>
@@ -206,11 +288,11 @@ export default function RoomPage({ code }: RoomPageProps) {
 
           <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Nama Panggilanmu</label>
+              <label style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>{t('nameEntryLabel')}</label>
               <input
                 className="input"
                 id="display-name-input"
-                placeholder="Masukkan nama kamu…"
+                placeholder={t('nameEntryPlaceholder')}
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
@@ -219,6 +301,28 @@ export default function RoomPage({ code }: RoomPageProps) {
                 style={{ fontSize: '15px', textAlign: 'center', fontWeight: 600 }}
               />
             </div>
+
+            {hasPin && (
+              <div>
+                <label style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px', fontWeight: 600 }}>
+                  <LockIcon size={13} color="var(--accent-pink)" /> {t('nameEntryPinLabel')}
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="input"
+                  id="room-pin-input"
+                  placeholder={t('pinPlaceholder')}
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                  maxLength={6}
+                  style={{ fontSize: '15px', textAlign: 'center', fontWeight: 700, letterSpacing: '0.15em' }}
+                />
+              </div>
+            )}
+
             {error && (
               <div style={{ color: '#f87171', fontSize: '12.5px', textAlign: 'center' }}>{error}</div>
             )}
@@ -228,7 +332,7 @@ export default function RoomPage({ code }: RoomPageProps) {
               onClick={handleJoin}
               id="join-room-confirm-btn"
             >
-              <CameraIcon size={18} /> Masuk ke Ruangan
+              <CameraIcon size={18} /> {t('btnEnterRoomConfirm')}
             </button>
           </div>
         </div>
@@ -238,9 +342,59 @@ export default function RoomPage({ code }: RoomPageProps) {
 
   if (phase === 'loading') {
     return (
-      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-        <div className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }} />
-        <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Menghubungkan ke room {code}…</p>
+      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '24px', position: 'relative' }}>
+        <ConnectionBanner />
+        <div className="spinner" style={{ width: '36px', height: '36px', borderWidth: '3px' }} />
+        <div style={{ textAlign: 'center', maxWidth: '360px' }}>
+          <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+            {t('connectingRoom', { code })}
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+            {takingLong ? t('connectingTakingLong') : t('connectingWaitHelp')}
+          </p>
+        </div>
+
+        {takingLong && (
+          <div style={{ display: 'flex', gap: '10px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                joinedRef.current = false;
+                setPhase('name_entry');
+              }}
+              id="btn-manual-entry"
+            >
+              {t('btnManualEntry')}
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                joinedRef.current = false;
+                setTakingLong(false);
+                const socket = connectSocket();
+                const name = localStorage.getItem(`name_${code}`) || displayName;
+                const token = localStorage.getItem(`token_${code}`) || sessionToken;
+                const pin = localStorage.getItem(`pin_${code}`) || pinInput;
+                if (name) {
+                  socket.emit('room:join', {
+                    roomCode: code,
+                    displayName: name,
+                    sessionToken: token || undefined,
+                    pin: pin || undefined,
+                  });
+                } else {
+                  setPhase('name_entry');
+                }
+              }}
+              id="btn-retry-conn"
+            >
+              {t('btnRetry')}
+            </button>
+            <a href="/" className="btn btn-ghost btn-sm" id="btn-back-home">
+              {t('btnLeave')}
+            </a>
+          </div>
+        )}
       </main>
     );
   }
@@ -262,94 +416,115 @@ export default function RoomPage({ code }: RoomPageProps) {
     );
   }
 
-  if (phase === 'lobby') {
-    return (
-      <Lobby
-        room={room}
-        participants={participants}
-        myParticipantId={myParticipantId}
-        onStart={() => setPhase('capturing')}
-      />
-    );
-  }
+  function renderPhaseContent() {
+    if (!room) return null;
 
-
-  if (phase === 'capturing') {
-    return (
-      <>
-        <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
-        <CapturePhase
+    if (phase === 'lobby') {
+      return (
+        <Lobby
           room={room}
           participants={participants}
           myParticipantId={myParticipantId}
-          slots={slots}
-          socket={getSocket()}
+          onStart={() => setPhase('capturing')}
         />
-      </>
-    );
+      );
+    }
+
+    if (phase === 'capturing') {
+      return (
+        <>
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <CapturePhase
+            room={room}
+            participants={participants}
+            myParticipantId={myParticipantId}
+            slots={slots}
+            socket={getSocket()}
+          />
+        </>
+      );
+    }
+
+    if (phase === 'frame_selection') {
+      return (
+        <>
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <FrameSelection
+            room={room}
+            participants={participants}
+            myParticipantId={myParticipantId}
+            slots={orderedSlots}
+            votes={votes}
+            socket={getSocket()}
+          />
+        </>
+      );
+    }
+
+    if (phase === 'photo_selection') {
+      return (
+        <>
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <PhotoSelection
+            room={room}
+            participants={participants}
+            myParticipantId={myParticipantId}
+            slots={slots}
+            socket={getSocket()}
+            frameTemplateId={lockedFrameId || room.settings?.selectedFrameTemplateId || room.settings?.layout}
+            customization={lockedCustomization}
+          />
+        </>
+      );
+    }
+
+    if (phase === 'rendering') {
+      return (
+        <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+          <div className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }} />
+          <h2 style={{ fontSize: '20px', fontWeight: 700 }}>
+            <span className="gradient-text">Generating Final Photo Strip…</span>
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Compositing split camera frames into high-resolution layout</p>
+        </main>
+      );
+    }
+
+    if (phase === 'completed') {
+      return (
+        <>
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <ResultPage
+            room={room}
+            participants={participants}
+            slots={orderedSlots}
+            downloadUrlPng={downloadUrlPng}
+            frameTemplateId={lockedFrameId || room.settings?.selectedFrameTemplateId || room.settings?.layout}
+            customization={lockedCustomization}
+            socket={getSocket()}
+          />
+        </>
+      );
+    }
+
+    return null;
   }
 
-  if (phase === 'frame_selection') {
-    return (
-      <>
-        <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
-        <FrameSelection
+  const phaseContent = renderPhaseContent();
+  if (!phaseContent) return null;
+
+  return (
+    <>
+      <ConnectionBanner />
+      {phaseContent}
+      {room && (
+        <RoomChat
           room={room}
           participants={participants}
           myParticipantId={myParticipantId}
-          slots={orderedSlots}
-          votes={votes}
           socket={getSocket()}
         />
-      </>
-    );
-  }
-
-  if (phase === 'photo_selection') {
-    return (
-      <>
-        <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
-        <PhotoSelection
-          room={room}
-          participants={participants}
-          myParticipantId={myParticipantId}
-          slots={slots}
-          socket={getSocket()}
-          frameTemplateId={lockedFrameId || room.settings?.selectedFrameTemplateId || room.settings?.layout}
-          customization={lockedCustomization}
-        />
-      </>
-    );
-  }
-
-  if (phase === 'rendering') {
-    return (
-      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-        <div className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }} />
-        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>
-          <span className="gradient-text">Generating Final Photo Strip…</span>
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Compositing split camera frames into high-resolution layout</p>
-      </main>
-    );
-  }
-
-  if (phase === 'completed') {
-    return (
-      <>
-        <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
-        <ResultPage
-          room={room}
-          participants={participants}
-          slots={orderedSlots}
-          downloadUrlPng={downloadUrlPng}
-          frameTemplateId={lockedFrameId || room.settings?.selectedFrameTemplateId || room.settings?.layout}
-          customization={lockedCustomization}
-          socket={getSocket()}
-        />
-      </>
-    );
-  }
-
-  return null;
+      )}
+    </>
+  );
 }

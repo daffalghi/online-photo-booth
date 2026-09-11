@@ -7,7 +7,7 @@ export function getSocket(): Socket {
   if (!socket) {
     socket = io(getSocketUrl(), {
       autoConnect: false,
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 20,
       reconnectionDelay: 1000,
@@ -23,5 +23,8 @@ export function connectSocket(): Socket {
 }
 
 export function disconnectSocket(): void {
-  socket?.disconnect();
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 }

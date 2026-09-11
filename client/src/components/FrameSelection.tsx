@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room, VoteStatus } from '@/types';
-import { FRAME_TEMPLATES, ExtendedFrameTemplate } from '@/lib/frameTemplates';
-import { CheckIcon, PaletteIcon, ClockIcon, SparklesIcon, GridIcon } from './Icons';
+import { FRAME_TEMPLATES, ExtendedFrameTemplate, fetchAllFrameTemplates } from '@/lib/frameTemplates';
+import { CheckIcon, PaletteIcon, ClockIcon, UploadIcon } from './Icons';
+import UploadFrameModal from './UploadFrameModal';
 
 interface FrameSelectionProps {
   room: Room;
@@ -26,11 +27,26 @@ const ACCENT_COLORS = [
 ];
 
 export default function FrameSelection({ room, participants, myParticipantId, slots, votes, socket }: FrameSelectionProps) {
+  const [allTemplates, setAllTemplates] = useState<ExtendedFrameTemplate[]>(FRAME_TEMPLATES);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [accentColor, setAccentColor] = useState('#ff5e97');
   const [captionText, setCaptionText] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'all' | '1x3' | '1x4' | '2x2' | '2x3'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'custom' | '1x3' | '1x4' | '2x2' | '2x3'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  // Dynamically fetch all shared custom frames and merge with built-ins
+  useEffect(() => {
+    let mounted = true;
+    fetchAllFrameTemplates().then((templates) => {
+      if (mounted && templates.length > 0) {
+        setAllTemplates(templates);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const me = participants.find((p) => p.id === myParticipantId);
   const partner = participants.find((p) => p.id !== myParticipantId);
@@ -61,6 +77,12 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
     }
   }
 
+  function handleFrameCreated(newFrame: ExtendedFrameTemplate) {
+    setAllTemplates((prev) => [newFrame, ...prev.filter((t) => t.id !== newFrame.id)]);
+    setActiveCategory('custom');
+    handleVote(newFrame.id);
+  }
+
   const isSolo = room.capacity === 1 || room.settings?.mode === 'solo';
   const unanimousTemplateId = isSolo
     ? (votes.length >= 1 ? votes[0].frameTemplateId : null)
@@ -68,20 +90,32 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
 
   // Filter templates by category and search
   const filteredTemplates = useMemo(() => {
-    return FRAME_TEMPLATES.filter((t) => {
-      const matchCat = activeCategory === 'all' || t.category === activeCategory || t.layout_type.includes(activeCategory);
+    return allTemplates.filter((t) => {
+      const isCustom = t.isCustom || t.id.startsWith('custom_');
+      const matchCat =
+        activeCategory === 'all' ||
+        (activeCategory === 'custom' && isCustom) ||
+        (activeCategory !== 'custom' && (t.category === activeCategory || t.layout_type?.includes(activeCategory)));
       const matchQuery = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchCat && matchQuery;
     });
-  }, [activeCategory, searchQuery]);
+  }, [allTemplates, activeCategory, searchQuery]);
 
-  const count1x3 = FRAME_TEMPLATES.filter((t) => t.category === '1x3' || t.layout_type.includes('1x3')).length;
-  const count1x4 = FRAME_TEMPLATES.filter((t) => t.category === '1x4' || t.layout_type.includes('1x4')).length;
-  const count2x2 = FRAME_TEMPLATES.filter((t) => t.category === '2x2' || t.layout_type.includes('2x2')).length;
-  const count2x3 = FRAME_TEMPLATES.filter((t) => t.category === '2x3' || t.layout_type.includes('2x3')).length;
+  const countCustom = allTemplates.filter((t) => t.isCustom || t.id.startsWith('custom_')).length;
+  const count1x3 = allTemplates.filter((t) => t.category === '1x3' || t.layout_type?.includes('1x3')).length;
+  const count1x4 = allTemplates.filter((t) => t.category === '1x4' || t.layout_type?.includes('1x4')).length;
+  const count2x2 = allTemplates.filter((t) => t.category === '2x2' || t.layout_type?.includes('2x2')).length;
+  const count2x3 = allTemplates.filter((t) => t.category === '2x3' || t.layout_type?.includes('2x3')).length;
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '16px', gap: '16px', maxWidth: '1120px', margin: '0 auto', width: '100%' }}>
+      {/* Upload Frame Modal */}
+      <UploadFrameModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        onFrameCreated={handleFrameCreated}
+      />
+
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent-pink)', marginBottom: '4px' }}>
@@ -93,8 +127,8 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
         </h1>
         <p style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '13px' }}>
           {isSolo
-            ? `Pilih salah satu template untuk lanjut ke penataan foto (${FRAME_TEMPLATES.length} Frame Tersedia).`
-            : `Pilih template yang sama bersama partnermu untuk lanjut ke penataan posisi foto (${FRAME_TEMPLATES.length} Frame Tersedia).`}
+            ? `Pilih salah satu template atau unggah desainmu sendiri (${allTemplates.length} Frame Tersedia).`
+            : `Pilih template yang sama bersama partnermu untuk lanjut ke penataan posisi foto (${allTemplates.length} Frame Tersedia).`}
         </p>
       </div>
 
@@ -102,7 +136,7 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
       <div className="glass-card" style={{ padding: '10px 18px', display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
         {participants.map((p) => {
           const vote = votes.find((v) => v.participantId === p.id);
-          const template = vote ? FRAME_TEMPLATES.find((t) => t.id === vote.frameTemplateId) : null;
+          const template = vote ? allTemplates.find((t) => t.id === vote.frameTemplateId) : null;
           const isMe = p.id === myParticipantId;
           return (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)' }}>
@@ -125,19 +159,25 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
 
         {unanimousTemplateId && (
           <span className="badge badge-green" style={{ fontSize: '12px', padding: '5px 14px' }}>
-            <SparklesIcon size={13} /> {isSolo ? 'Frame Terpilih! Membuka Penataan Foto…' : 'Pilihan Sepakat! Membuka Penataan Foto…'}
+            <CheckIcon size={13} /> {isSolo ? 'Frame Terpilih! Membuka Penataan Foto…' : 'Pilihan Sepakat! Membuka Penataan Foto…'}
           </span>
         )}
       </div>
 
       {/* Category Tabs & Search Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <div className="filter-tabs">
+        <div className="filter-tabs touch-scroll" style={{ display: 'flex', flexWrap: 'nowrap', gap: '6px', maxWidth: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
           <button
             className={`filter-tab ${activeCategory === 'all' ? 'active' : ''}`}
             onClick={() => setActiveCategory('all')}
           >
-            Semua ({FRAME_TEMPLATES.length})
+            Semua ({allTemplates.length})
+          </button>
+          <button
+            className={`filter-tab ${activeCategory === 'custom' ? 'active' : ''}`}
+            onClick={() => setActiveCategory('custom')}
+          >
+            Kustom ({countCustom})
           </button>
           <button
             className={`filter-tab ${activeCategory === '1x3' ? 'active' : ''}`}
@@ -165,21 +205,59 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
           </button>
         </div>
 
-        <input
-          className="input"
-          placeholder="Cari nama template…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '100%', maxWidth: '240px', padding: '7px 14px', fontSize: '12.5px' }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setIsUploadOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px', fontSize: '12px', background: 'linear-gradient(135deg, #ff5e97, #8b5cf6)', border: 'none' }}
+          >
+            <UploadIcon size={15} /> Unggah Frame
+          </button>
+
+          <input
+            className="input"
+            placeholder="Cari frame…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', maxWidth: '180px', padding: '7px 12px', fontSize: '12px' }}
+          />
+        </div>
       </div>
 
       {/* Frame Gallery Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
+      <div className="frame-gallery-grid">
+        {/* Upload Own Frame Card */}
+        {(activeCategory === 'all' || activeCategory === 'custom') && !searchQuery && (
+          <div
+            onClick={() => setIsUploadOpen(true)}
+            style={{
+              padding: '20px 14px',
+              border: '2px dashed rgba(255, 94, 151, 0.4)',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(255, 94, 151, 0.04)',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              minHeight: '210px',
+              transition: 'all 200ms ease',
+            }}
+          >
+            <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(255,94,151,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-pink)', marginBottom: '10px' }}>
+              <UploadIcon size={22} />
+            </div>
+            <p style={{ fontWeight: 700, fontSize: '13px', color: 'white', marginBottom: '4px' }}>Unggah Frame Sendiri</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.4' }}>Deteksi otomatis lubang foto & jadikan aset bersama</p>
+          </div>
+        )}
+
         {filteredTemplates.map((template) => {
           const isMyVote = myVote?.frameTemplateId === template.id;
           const isPartnerVote = partnerVote?.frameTemplateId === template.id;
           const isUnanimous = unanimousTemplateId === template.id;
+          const isCustom = template.isCustom || template.id.startsWith('custom_');
 
           return (
             <button
@@ -188,7 +266,7 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
               onClick={() => handleVote(template.id)}
               style={{
                 padding: 0,
-                border: isMyVote ? `2px solid ${template.accent_color}` : '1px solid var(--border-subtle)',
+                border: isMyVote ? `2px solid ${template.accent_color || template.accentColor || '#ff5e97'}` : '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-md)',
                 overflow: 'hidden',
                 cursor: 'pointer',
@@ -196,7 +274,7 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
                 position: 'relative',
                 transform: isMyVote ? 'scale(1.02)' : 'scale(1)',
                 transition: 'all 200ms ease',
-                boxShadow: isMyVote ? `0 0 16px ${template.accent_color}33` : 'none',
+                boxShadow: isMyVote ? `0 0 16px ${template.accent_color || template.accentColor || '#ff5e97'}33` : 'none',
                 textAlign: 'left',
                 display: 'flex',
                 flexDirection: 'column',
@@ -204,21 +282,27 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
             >
               {/* Thumbnail Container */}
               <div style={{ height: '145px', background: '#0a0c12', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                <FrameThumbnail template={template} shots={slots} accentColor={template.accent_color} />
+                <FrameThumbnail template={template} shots={slots} accentColor={template.accent_color || template.accentColor || '#ff5e97'} />
+
+                {isCustom && (
+                  <div style={{ position: 'absolute', top: '6px', left: '6px', background: 'rgba(255,94,151,0.85)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontSize: '10px', fontWeight: 700, color: 'white', zIndex: 5 }}>
+                    Kustom
+                  </div>
+                )}
 
                 {isMyVote && (
-                  <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.85)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontSize: '10.5px', fontWeight: 700, color: template.accent_color, display: 'flex', alignItems: 'center', gap: '4px', zIndex: 5 }}>
+                  <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.85)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontSize: '10.5px', fontWeight: 700, color: template.accent_color || template.accentColor || '#ff5e97', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 5 }}>
                     <CheckIcon size={11} /> Pilihanmu
                   </div>
                 )}
                 {isPartnerVote && !isMyVote && (
-                  <div style={{ position: 'absolute', top: '6px', left: '6px', background: 'rgba(0,0,0,0.85)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontSize: '10.5px', color: 'var(--accent-violet)', zIndex: 5 }}>
+                  <div style={{ position: 'absolute', top: '6px', left: isCustom ? '60px' : '6px', background: 'rgba(0,0,0,0.85)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontSize: '10.5px', color: 'var(--accent-violet)', zIndex: 5 }}>
                     {partner?.displayName} Memilih
                   </div>
                 )}
                 {isUnanimous && (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.65)', zIndex: 6 }}>
-                    <span className="badge badge-green"><SparklesIcon size={14} /> Terpilih</span>
+                    <span className="badge badge-green"><CheckIcon size={14} /> Terpilih</span>
                   </div>
                 )}
               </div>

@@ -22,7 +22,7 @@ export type RoundStatus =
   | 'previewing'
   | 'locked';
 
-export type ParticipantSide = 'left' | 'right';
+export type ParticipantSide = 'left' | 'right' | string;
 
 export type ConnectionStatus = 'connected' | 'disconnected';
 
@@ -36,7 +36,7 @@ export interface RoomSettings {
   shotCount: number;        // default 3
   countdownSeconds: number; // default 3
   layout: 'strip3' | 'strip4' | 'grid2x2' | 'single' | string;
-  mode?: 'solo' | 'duo';    // default duo
+  mode?: 'solo' | 'duo' | 'group'; // default duo
   selectedPhotoOrder?: (number | string)[];
   photoOffsets?: Record<number | string, PhotoCropOffset>;
   selectedFrameTemplateId?: string;
@@ -54,6 +54,7 @@ export interface Room {
   createdAt: number;
   expiresAt: number;
   completedAt?: number;
+  pin?: string | null;
 }
 
 export interface Participant {
@@ -102,6 +103,7 @@ export interface FrameTemplate {
   frameWidth?: number;
   frameHeight?: number;
   cutoutBoxes?: CutoutBox[];
+  isCustom?: boolean;
 }
 
 export interface Vote {
@@ -145,6 +147,7 @@ export interface RoomRow {
   created_at: number;
   expires_at: number;
   completed_at?: number | null;
+  pin?: string | null;
 }
 
 export interface ParticipantRow {
@@ -188,12 +191,20 @@ export interface FinalRenderRow {
   rendered_at: number;
 }
 
+export interface ParticipantPhoto {
+  participantId: string;
+  side: string;
+  url: string;
+  displayName?: string;
+}
+
 export interface PairedShot {
   slotIndex: number;
   leftPhotoUrl: string;
   rightPhotoUrl: string;
   keptByParticipantIds: string[];
   status: RoundStatus;
+  photos?: ParticipantPhoto[];
 }
 
 // Socket.IO event payloads
@@ -236,7 +247,7 @@ export interface VoteCastPayload {
 export interface WebRTCSignalPayload {
   roomId: string;
   targetParticipantId: string;
-  signal: any;
+  signal: unknown;
   fromParticipantId: string;
 }
 

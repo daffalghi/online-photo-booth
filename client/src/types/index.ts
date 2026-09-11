@@ -15,14 +15,14 @@ export type RoundStatus =
   | 'previewing'
   | 'locked';
 
-export type ParticipantSide = 'left' | 'right';
+export type ParticipantSide = 'left' | 'right' | string;
 export type ConnectionStatus = 'connected' | 'disconnected';
 
 export interface RoomSettings {
   shotCount: number;
   countdownSeconds: number;
   layout: 'strip3' | 'strip4' | 'grid2x2' | 'single' | string;
-  mode?: 'solo' | 'duo';
+  mode?: 'solo' | 'duo' | 'group';
   selectedPhotoOrder?: (number | string)[];
   photoOffsets?: Record<number | string, { x?: number; y?: number; scale?: number }>;
   selectedFrameTemplateId?: string;
@@ -41,6 +41,8 @@ export interface Room {
   createdAt: number;
   expiresAt: number;
   completedAt?: number;
+  hasPin?: boolean;
+  pin?: string | null;
 }
 
 export interface Participant {
@@ -66,12 +68,20 @@ export interface Photo {
   keptByParticipantIds: string[];
 }
 
+export interface ParticipantPhoto {
+  participantId: string;
+  side: string;
+  url: string;
+  displayName?: string;
+}
+
 export interface PairedShot {
   slotIndex: number;
   leftPhotoUrl: string;
   rightPhotoUrl: string;
   keptByParticipantIds: string[];
   status: RoundStatus;
+  photos?: ParticipantPhoto[];
 }
 
 export interface CutoutBox {
@@ -103,6 +113,7 @@ export interface FrameTemplate {
   frameWidth?: number;
   frameHeight?: number;
   cutoutBoxes?: CutoutBox[];
+  isCustom?: boolean;
 }
 
 export interface VoteCustomization {

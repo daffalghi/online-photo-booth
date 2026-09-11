@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { CameraIcon, PaletteIcon, LayoutIcon, SparklesIcon, CopyIcon, CheckIcon, HomeIcon, UsersIcon } from './Icons';
+import { CameraIcon, PaletteIcon, LayoutIcon, DownloadIcon, CopyIcon, CheckIcon, HomeIcon, UsersIcon } from './Icons';
 import { Participant, RoomStatus } from '@/types';
+import { useLanguage } from '@/lib/i18n';
+import LanguageSwitcher from './LanguageSwitcher';
+
+import ConfirmModal from './ConfirmModal';
 
 interface StepHeaderProps {
   roomCode: string;
@@ -11,18 +15,20 @@ interface StepHeaderProps {
   myParticipantId: string;
 }
 
-const STEPS = [
-  { key: 'capturing', stepNum: '1', title: 'Shoot', desc: 'Ambil Foto', icon: CameraIcon },
-  { key: 'frame_selection', stepNum: '2', title: 'Frame', desc: 'Pilih Frame', icon: PaletteIcon },
-  { key: 'photo_selection', stepNum: '3', title: 'Place', desc: 'Atur Posisi', icon: LayoutIcon },
-  { key: 'completed', stepNum: '4', title: 'Finish', desc: 'Selesai', icon: SparklesIcon },
-];
-
 export default function StepHeader({ roomCode, status, participants, myParticipantId }: StepHeaderProps) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const me = participants.find((p) => p.id === myParticipantId);
   const partner = participants.find((p) => p.id !== myParticipantId);
+
+  const STEPS = [
+    { key: 'capturing', stepNum: '1', title: t('step1Title'), desc: t('step1Desc'), icon: CameraIcon },
+    { key: 'frame_selection', stepNum: '2', title: t('step2Title'), desc: t('step2Desc'), icon: PaletteIcon },
+    { key: 'photo_selection', stepNum: '3', title: t('step3Title'), desc: t('step3Desc'), icon: LayoutIcon },
+    { key: 'completed', stepNum: '4', title: t('step4Title'), desc: t('step4Desc'), icon: DownloadIcon },
+  ];
 
   function handleCopyCode() {
     navigator.clipboard.writeText(roomCode);
@@ -32,11 +38,10 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
 
   function handleLeave() {
     if (status !== 'completed') {
-      if (!confirm('Apakah kamu yakin ingin keluar dari photobooth? Sesi yang berjalan akan dibatalkan.')) {
-        return;
-      }
+      setShowLeaveModal(true);
+    } else {
+      window.location.href = '/';
     }
-    window.location.href = '/';
   }
 
   // Determine active step index
@@ -144,26 +149,26 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
             alignItems: 'center',
             gap: '4px',
             background: 'rgba(255,255,255,0.03)',
-            padding: '4px 6px',
+            padding: '3px 6px',
             borderRadius: 'var(--radius-full)',
             border: '1px solid rgba(255,255,255,0.06)',
           }}
         >
           {STEPS.map((step, idx) => {
-            const Icon = step.icon;
             const isActive = activeIdx === idx;
             const isCompleted = activeIdx > idx;
 
             return (
               <div
                 key={step.key}
+                className={isActive ? 'step-item-active' : ''}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
+                  gap: '5px',
+                  padding: isActive ? '3px 10px' : '3px 6px',
                   borderRadius: 'var(--radius-full)',
-                  fontSize: '12px',
+                  fontSize: '11.5px',
                   fontWeight: isActive ? 700 : 500,
                   color: isActive ? '#ffffff' : isCompleted ? '#34d399' : 'var(--text-muted)',
                   backgroundColor: isActive ? 'rgba(255, 94, 151, 0.22)' : 'transparent',
@@ -187,18 +192,20 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
                     fontSize: '10px',
                     fontWeight: 800,
                     color: '#ffffff',
+                    flexShrink: 0,
                   }}
                 >
                   {isCompleted ? <CheckIcon size={10} color="#ffffff" /> : step.stepNum}
                 </div>
-                <span>{step.title}</span>
+                <span className="step-item-title">{step.title}</span>
               </div>
             );
           })}
         </nav>
 
-        {/* Right: Partner Connection Status */}
+        {/* Right: Language Switcher & Partner Connection Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <LanguageSwitcher />
           {partner ? (
             <div
               style={{
@@ -232,6 +239,20 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showLeaveModal}
+        title={t('leaveConfirmTitle')}
+        message={t('leaveConfirmDesc')}
+        confirmText={t('btnLeave')}
+        cancelText={t('btnStay')}
+        isDestructive
+        onConfirm={() => {
+          setShowLeaveModal(false);
+          window.location.href = '/';
+        }}
+        onCancel={() => setShowLeaveModal(false)}
+      />
     </header>
   );
 }

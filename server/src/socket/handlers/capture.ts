@@ -15,8 +15,8 @@ const COUNTDOWN_BUFFER_MS = 800;
 /** participantId → Set of participants who pressed "Take Photo" for a given round */
 const readyMap = new Map<string, Map<number, Set<string>>>();
 
-/** Uploaded frames per room + round */
-const uploadMap = new Map<string, Map<number, { left?: string; right?: string }>>();
+/** Uploaded frames per room + round (participantId -> storageKey) */
+const uploadMap = new Map<string, Map<number, Map<string, string>>>();
 
 /** participantId → Set of participants who clicked "Keep This Shot" for a given round */
 const keepMap = new Map<string, Map<number, Set<string>>>();
@@ -129,32 +129,30 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
       await fs.promises.writeFile(filePath, imageBuffer);
       await roomService.savePhoto(roomId, participantId, participant.side, slotIndex, storageKey, filters);
 
-      // Track in-memory for pair completion check
+      // Track in-memory for round completion check
       if (!uploadMap.has(roomId)) uploadMap.set(roomId, new Map());
       const roomUploads = uploadMap.get(roomId)!;
-      if (!roomUploads.has(slotIndex)) roomUploads.set(slotIndex, {});
+      if (!roomUploads.has(slotIndex)) roomUploads.set(slotIndex, new Map());
       const roundUploads = roomUploads.get(slotIndex)!;
-      if (participant.side === 'left') roundUploads.left = storageKey;
-      else roundUploads.right = storageKey;
+      roundUploads.set(participantId, storageKey);
 
-      // Both sides uploaded (or Solo mode single upload) → update room round to previewing & broadcast
+      // Check if all connected participants have uploaded
+      const participants = await roomService.getParticipants(roomId);
+      const activeParticipants = participants.filter((p) => p.connectionStatus === 'connected');
+      const targetParticipants = activeParticipants.length > 0 ? activeParticipants : participants;
+
       const isSolo = room.capacity === 1 || room.settings?.mode === 'solo';
-      if (isSolo) {
-        roundUploads.left = storageKey;
-        roundUploads.right = storageKey;
+      const allUploaded = isSolo || targetParticipants.every((p) => roundUploads.has(p.id));
+
+      if (allUploaded) {
         await roomService.updateRoomRound(roomId, slotIndex, 'previewing');
+        const shots = await roomService.getPairedShots(roomId, baseUrl);
+        const thisShot = shots.find((s) => s.slotIndex === slotIndex);
         io.to(roomId).emit('capture:pairReady', {
           slotIndex,
-          leftPhotoUrl: `${baseUrl}/uploads/${storageKey}`,
-          rightPhotoUrl: `${baseUrl}/uploads/${storageKey}`,
-        });
-        await broadcastRoomState(io, roomId, baseUrl);
-      } else if (roundUploads.left && roundUploads.right) {
-        await roomService.updateRoomRound(roomId, slotIndex, 'previewing');
-        io.to(roomId).emit('capture:pairReady', {
-          slotIndex,
-          leftPhotoUrl: `${baseUrl}/uploads/${roundUploads.left}`,
-          rightPhotoUrl: `${baseUrl}/uploads/${roundUploads.right}`,
+          leftPhotoUrl: thisShot?.leftPhotoUrl || `${baseUrl}/uploads/${storageKey}`,
+          rightPhotoUrl: thisShot?.rightPhotoUrl || `${baseUrl}/uploads/${storageKey}`,
+          photos: thisShot?.photos || [],
         });
         await broadcastRoomState(io, roomId, baseUrl);
       }

@@ -38,6 +38,12 @@
   --radius-xl: 24px;
   --radius-full: 9999px;
 
+  /* Safe Area Insets (iPhone notch / dynamic island / Android gesture navigation) */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
@@ -59,6 +65,8 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  height: 100%;
 }
 
 body {
@@ -66,10 +74,16 @@ body {
   background-color: var(--bg-deep);
   color: var(--text-primary);
   min-height: 100dvh;
+  min-height: -webkit-fill-available;
   overflow-x: hidden;
   background-image: 
     radial-gradient(ellipse 60% 50% at 50% -20%, rgba(139, 92, 246, 0.12), transparent),
     radial-gradient(ellipse 40% 30% at 80% 50%, rgba(255, 94, 151, 0.06), transparent);
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+  touch-action: manipulation;
 }
 
 /* ── Scrollbars ────────────────────────────── */
@@ -412,10 +426,144 @@ p { line-height: 1.55; }
   50% { box-shadow: 0 0 0 6px rgba(255, 94, 151, 0.7); }
 }
 
-/* Responsive grid layouts */
+/* Responsive grid layouts & Mobile Optimization */
 @media (max-width: 768px) {
   .responsive-split {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* Prevent iOS Safari auto-zoom on input focus */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Touch-friendly horizontal scroll utility */
+.touch-scroll {
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.touch-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Camera responsive views */
+.camera-view-duo {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #090a10;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+  aspect-ratio: 16/10;
+  max-height: 480px;
+  position: relative;
+}
+
+@media (max-width: 640px) {
+  .camera-view-duo {
+    aspect-ratio: 1 / 1 !important;
+    max-height: 48dvh !important;
+    min-height: 240px;
+  }
+}
+
+.camera-view-group {
+  width: 100%;
+  max-width: 840px;
+  display: grid;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #090a10;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+  position: relative;
+  padding: 10px;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .camera-view-group {
+    padding: 6px !important;
+    gap: 6px !important;
+  }
+}
+
+/* Responsive Frame Gallery */
+.frame-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 640px) {
+  .frame-gallery-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    max-height: calc(100dvh - 270px) !important;
+  }
+}
+
+/* Responsive Photo Pool */
+.photo-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 640px) {
+  .photo-pool-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .photo-pool-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Stepper labels on mobile */
+.step-item-title {
+  display: inline;
+}
+
+@media (max-width: 640px) {
+  .step-item-title {
+    display: none;
+  }
+  .step-item-active .step-item-title {
+    display: inline;
+  }
+}
+
+/* General responsive helper utilities */
+@media (max-width: 640px) {
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+  .mobile-full-width {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .mobile-p-sm {
+    padding: 12px 14px !important;
+  }
+  .steps-grid-mobile {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 

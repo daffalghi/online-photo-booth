@@ -23,20 +23,27 @@ router.get('/info/local-ip', (_req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { shotCount, countdownSeconds, layout, mode } = req.body ?? {};
-    const room = await roomService.createRoom({
-      shotCount: shotCount ?? (mode === 'solo' ? 4 : 3),
-      countdownSeconds: countdownSeconds ?? 3,
-      layout: layout ?? 'strip4',
-      mode: mode ?? 'duo',
-    });
+    const { shotCount, countdownSeconds, layout, mode, pin } = req.body ?? {};
+    const room = await roomService.createRoom(
+      {
+        shotCount: shotCount ?? (mode === 'solo' ? 4 : 3),
+        countdownSeconds: countdownSeconds ?? 3,
+        layout: layout ?? 'strip4',
+        mode: mode ?? 'duo',
+      },
+      pin,
+    );
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const joinUrl = `${clientUrl}/room/${room.code}`;
     const qrDataUrl = await qrcode.toDataURL(joinUrl, { width: 200, margin: 1 });
-    res.json({ room, joinUrl, qrDataUrl });
-  } catch (err) {
+    res.json({
+      room: { ...room, hasPin: Boolean(room.pin), pin: undefined },
+      joinUrl,
+      qrDataUrl,
+    });
+  } catch (err: unknown) {
     console.error('POST /rooms error:', err);
-    res.status(500).json({ error: 'Failed to create room' });
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to create room' });
   }
 });
 
@@ -46,7 +53,11 @@ router.get('/:code', async (req, res) => {
   const participants = await roomService.getParticipants(room.id);
   const baseUrl = process.env.SERVER_URL || 'http://localhost:3001';
   const slots = await roomService.getPairedShots(room.id, baseUrl);
-  res.json({ room, participants, slots });
+  res.json({
+    room: { ...room, hasPin: Boolean(room.pin), pin: undefined },
+    participants,
+    slots,
+  });
 });
 
 router.post('/:code/start', async (req, res) => {

@@ -65,6 +65,28 @@ function getLayoutConfig(template: FrameTemplate, isSolo = false): LayoutConfig 
   const fH = frameHeight || (cat === '1x3' || cat === '1x4' ? 1800 : cat === '2x3' ? 1368 : 1750);
   const boxes = cutoutBoxes && cutoutBoxes.length > 0 ? cutoutBoxes : [];
 
+  // Custom user-uploaded frames with detected cutout holes
+  if (cat === 'custom' || template.id.startsWith('custom_')) {
+    const leftBoxes: FrameBox[] = boxes.map((b) => ({
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+    }));
+
+    return {
+      width: fW,
+      height: fH,
+      leftBoxes,
+      rightBoxes: [],
+      isTwinStrip: false,
+      singleStripWidth: fW,
+      singleStripHeight: fH,
+      gap: 0,
+      layoutType: template.layoutType || 'custom',
+    };
+  }
+
   if (cat === '1x3') {
     const singleW = fW;
     const singleH = fH;
@@ -275,8 +297,10 @@ async function extractAndResizePhoto(
 
   return sharp(filePath)
     .extract({ left: sX, top: sY, width: sW, height: sH })
-    .resize(Math.round(boxWidth), Math.round(boxHeight))
-    .png()
+    .resize(Math.round(boxWidth), Math.round(boxHeight), {
+      kernel: sharp.kernel.lanczos3,
+    })
+    .png({ quality: 100 })
     .toBuffer();
 }
 
@@ -404,7 +428,17 @@ export async function compositePhotos(
   const overlayUrl = template.overlayUrl || template.overlay_url;
   if (overlayUrl) {
     const rel = overlayUrl.startsWith('/') ? overlayUrl.slice(1) : overlayUrl;
-    overlayFilePath = path.join(CLIENT_PUBLIC_DIR, decodeURIComponent(rel));
+    const candidates = [
+      path.join(__dirname, '../../', decodeURIComponent(rel)),
+      path.join(CLIENT_PUBLIC_DIR, decodeURIComponent(rel)),
+      path.join(UPLOADS_DIR, 'frames', path.basename(decodeURIComponent(rel))),
+    ];
+    for (const cand of candidates) {
+      if (fs.existsSync(cand)) {
+        overlayFilePath = cand;
+        break;
+      }
+    }
   }
 
   if (overlayFilePath && fs.existsSync(overlayFilePath)) {
@@ -445,7 +479,7 @@ export async function compositePhotos(
   const outputKey = `render_${roomId}_${Date.now()}.png`;
   const outputPath = path.join(RENDERS_DIR, outputKey);
 
-  await composite.composite(composites).png({ quality: 95 }).toFile(outputPath);
+  await composite.composite(composites).png({ quality: 100, compressionLevel: 6 }).toFile(outputPath);
   return outputKey;
 }
 
