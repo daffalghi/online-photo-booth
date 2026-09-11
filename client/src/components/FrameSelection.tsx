@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room, VoteStatus } from '@/types';
 import { FRAME_TEMPLATES, ExtendedFrameTemplate, fetchAllFrameTemplates } from '@/lib/frameTemplates';
+import { stopLocalStream } from '@/lib/webrtc';
 import { CheckIcon, PaletteIcon, ClockIcon, UploadIcon } from './Icons';
 import UploadFrameModal from './UploadFrameModal';
 
@@ -34,6 +35,11 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
   const [activeCategory, setActiveCategory] = useState<'all' | 'custom' | '1x3' | '1x4' | '2x2' | '2x3'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  // Guarantee camera hardware is turned off in frame selection
+  useEffect(() => {
+    stopLocalStream();
+  }, []);
 
   // Dynamically fetch all shared custom frames and merge with built-ins
   useEffect(() => {

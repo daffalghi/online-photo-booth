@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room } from '@/types';
 import { FRAME_TEMPLATES, ExtendedFrameTemplate, getCanvasLayout, CanvasLayoutConfig } from '@/lib/frameTemplates';
+import { stopLocalStream } from '@/lib/webrtc';
 import {
   CheckIcon,
   CloseIcon,
@@ -156,55 +157,10 @@ export default function PhotoSelection({
     });
   }, [totalSlots]);
 
-  // Automatically fill empty slots with captured photos so mobile users never see blank placeholders
+  // Guarantee camera hardware is completely stopped in photo selection
   useEffect(() => {
-    if (allIndividualPhotos.length === 0 || totalSlots === 0) return;
-
-    setSlotAssignments((prev) => {
-      const hasAnyAssigned = prev.some((x) => x !== null && x !== undefined && x !== '');
-      if (hasAnyAssigned) return prev;
-
-      const next = Array(totalSlots).fill(null);
-      if (layout.isTwinStrip && layout.leftBoxes.length > 0 && layout.rightBoxes.length > 0) {
-        const leftPhotos = allIndividualPhotos.filter((p) => p.side === 'left');
-        const rightPhotos = allIndividualPhotos.filter((p) => p.side === 'right');
-        const leftBoxCount = layout.leftBoxes.length;
-
-        layout.leftBoxes.forEach((_, idx) => {
-          if (leftPhotos[idx]) {
-            next[idx] = leftPhotos[idx].id;
-          } else if (allIndividualPhotos[idx]) {
-            next[idx] = allIndividualPhotos[idx].id;
-          }
-        });
-
-        layout.rightBoxes.forEach((_, idx) => {
-          const slotIdx = leftBoxCount + idx;
-          if (rightPhotos[idx]) {
-            next[slotIdx] = rightPhotos[idx].id;
-          } else if (allIndividualPhotos[idx]) {
-            next[slotIdx] = allIndividualPhotos[idx].id;
-          }
-        });
-      } else {
-        allIndividualPhotos.forEach((photo, idx) => {
-          if (idx < totalSlots) {
-            next[idx] = photo.id;
-          }
-        });
-      }
-
-      if (me?.isHost || isSolo) {
-        socket.emit('photoSelection:update', {
-          roomId: room.id,
-          selectedOrder: next,
-          photoOffsets: {},
-        });
-      }
-
-      return next;
-    });
-  }, [allIndividualPhotos, totalSlots, layout, me?.isHost, isSolo, room.id, socket]);
+    stopLocalStream();
+  }, []);
 
   // ─── Socket Sync ────────────────────────────────────────────────────────────
   useEffect(() => {

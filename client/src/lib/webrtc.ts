@@ -58,60 +58,85 @@ export function setRemoteStreamCallback(cb: (stream: MediaStream) => void): void
   }
 }
 
+const activeLocalTracks = new Set<MediaStreamTrack>();
+let localStreamPromise: Promise<MediaStream> | null = null;
+
 export async function getLocalStream(): Promise<MediaStream> {
-  if (localStream) return localStream;
-  if (!navigator?.mediaDevices?.getUserMedia) {
-    throw new Error('Camera access requires HTTPS or localhost. If opening on mobile over IP, use HTTPS or enable the Chrome flag.');
+  if (localStream && localStream.active && localStream.getVideoTracks().some((t) => t.readyState === 'live')) {
+    return localStream;
+  }
+  if (localStreamPromise) {
+    return localStreamPromise;
   }
 
-  try {
-    // Request maximum sensor resolution (up to 4K / 1080p Full HD at 60fps)
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-        width: { ideal: 3840, min: 640 },
-        height: { ideal: 2160, min: 480 },
-        frameRate: { ideal: 60, min: 24 },
-      },
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 2,
-        sampleRate: 48000,
-      },
-    });
-
-    // If hardware sensor supports even higher native resolution, apply maximum limits
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack && videoTrack.applyConstraints && typeof videoTrack.getCapabilities === 'function') {
-      try {
-        const caps = videoTrack.getCapabilities();
-        if (caps && caps.width && caps.height) {
-          await videoTrack.applyConstraints({
-            width: { ideal: caps.width.max || 3840 },
-            height: { ideal: caps.height.max || 2160 },
-            frameRate: { ideal: caps.frameRate?.max || 60 },
-          });
-        }
-      } catch (_) {
-        // Non-critical: continue with acquired constraints
+  localStreamPromise = (async () => {
+    try {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error('Camera access requires HTTPS or localhost. If opening on mobile over IP, use HTTPS or enable the Chrome flag.');
       }
-    }
-  } catch (err) {
-    console.warn('[WebRTC] Failed to acquire audio + video at ultra-high res, falling back:', err);
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-        width: { ideal: 1920, min: 640 },
-        height: { ideal: 1080, min: 480 },
-        frameRate: { ideal: 30 },
-      },
-      audio: false,
-    });
-  }
 
-  return localStream;
+      let acquiredStream: MediaStream;
+      try {
+        // Request maximum sensor resolution (up to 4K / 1080p Full HD at 60fps)
+        acquiredStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 3840, min: 640 },
+            height: { ideal: 2160, min: 480 },
+            frameRate: { ideal: 60, min: 24 },
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 2,
+            sampleRate: 48000,
+          },
+        });
+
+        // If hardware sensor supports even higher native resolution, apply maximum limits
+        const videoTrack = acquiredStream.getVideoTracks()[0];
+        if (videoTrack && videoTrack.applyConstraints && typeof videoTrack.getCapabilities === 'function') {
+          try {
+            const caps = videoTrack.getCapabilities();
+            if (caps && caps.width && caps.height) {
+              await videoTrack.applyConstraints({
+                width: { ideal: caps.width.max || 3840 },
+                height: { ideal: caps.height.max || 2160 },
+                frameRate: { ideal: caps.frameRate?.max || 60 },
+              });
+            }
+          } catch (_) {
+            // Non-critical: continue with acquired constraints
+          }
+        }
+      } catch (err) {
+        console.warn('[WebRTC] Failed to acquire audio + video at ultra-high res, falling back:', err);
+        acquiredStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1920, min: 640 },
+            height: { ideal: 1080, min: 480 },
+            frameRate: { ideal: 30 },
+          },
+          audio: false,
+        });
+      }
+
+      // Track all tracks so they can never be orphaned or left active
+      acquiredStream.getTracks().forEach((track) => {
+        activeLocalTracks.add(track);
+        track.addEventListener('ended', () => activeLocalTracks.delete(track));
+      });
+
+      localStream = acquiredStream;
+      return acquiredStream;
+    } finally {
+      localStreamPromise = null;
+    }
+  })();
+
+  return localStreamPromise;
 }
 
 let micState = true;
@@ -162,8 +187,37 @@ export async function toggleMic(): Promise<boolean> {
 }
 
 export function stopLocalStream(): void {
-  localStream?.getTracks().forEach((t) => t.stop());
-  localStream = null;
+  activeLocalTracks.forEach((track) => {
+    try {
+      track.stop();
+      track.enabled = false;
+    } catch (_) {}
+  });
+  activeLocalTracks.clear();
+
+  if (localStream) {
+    try {
+      localStream.getTracks().forEach((t) => {
+        t.stop();
+        t.enabled = false;
+      });
+    } catch (_) {}
+    localStream = null;
+  }
+  localStreamPromise = null;
+
+  peerConnections.forEach((pc) => {
+    try {
+      pc.getSenders().forEach((sender) => {
+        if (sender.track) {
+          try {
+            sender.track.stop();
+            sender.track.enabled = false;
+          } catch (_) {}
+        }
+      });
+    } catch (_) {}
+  });
 }
 
 /** Modify SDP to allocate ultra-high definition bitrate (10 Mbps) with Google min/start bitrate flags */
