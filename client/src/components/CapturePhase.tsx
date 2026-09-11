@@ -6,6 +6,8 @@ import { PairedShot, Participant, Room, RoundStatus } from '@/types';
 import { captureFrame, FilterType } from '@/lib/capture';
 import {
   getLocalStream,
+  stopLocalStream,
+  closePeerConnection,
   initiatePeerConnection,
   handleWebRTCSignal,
   subscribeRemoteStreams,
@@ -166,7 +168,14 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
             : 'Tidak dapat memulai kamera: ' + err.message,
         );
       });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      stopLocalStream();
+      closePeerConnection();
+    };
   }, []);
 
   // ─── WebRTC (Multi-Peer Mesh for Duo and Group mode) ───────────────────────

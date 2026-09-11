@@ -88,6 +88,13 @@ export async function initDb(): Promise<void> {
       t.text('description').nullable();
       t.string('accent_color').notNullable().defaultTo('#ff6b9d');
       t.string('thumbnail_gradient').notNullable();
+      t.string('overlay_key').nullable();
+      t.text('cutout_boxes_json').nullable();
+      t.integer('frame_width').nullable();
+      t.integer('frame_height').nullable();
+      t.string('category').nullable();
+      t.integer('is_custom').notNullable().defaultTo(0);
+      t.bigInteger('created_at').nullable();
     });
 
     // Seed templates
@@ -106,9 +113,11 @@ export async function initDb(): Promise<void> {
         await knex('frame_templates').insert(t);
       }
     }
-  } else {
-    // Migration: ensure custom frame columns exist
-    if (!(await knex.schema.hasColumn('frame_templates', 'overlay_key'))) {
+  }
+
+  // Migration: ensure custom frame columns exist if table already exists without them
+  if (await knex.schema.hasTable('frame_templates')) {
+    if (!(await knex.schema.hasColumn('frame_templates', 'is_custom'))) {
       await knex.schema.table('frame_templates', (t) => {
         t.string('overlay_key').nullable();
         t.text('cutout_boxes_json').nullable();

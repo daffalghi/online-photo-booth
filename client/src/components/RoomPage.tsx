@@ -48,6 +48,13 @@ export default function RoomPage({ code }: RoomPageProps) {
   const [takingLong, setTakingLong] = useState(false);
   const joinedRef = useRef(false);
 
+  // Ensure camera hardware and streams are turned off when outside of capturing phase
+  useEffect(() => {
+    if (phase !== 'capturing') {
+      stopLocalStream();
+    }
+  }, [phase]);
+
   // Monitor loading timeout
   useEffect(() => {
     if (phase !== 'loading') {
