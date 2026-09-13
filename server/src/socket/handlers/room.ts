@@ -120,6 +120,23 @@ export function handleRoomJoin(io: Server, socket: AppSocket, baseUrl: string): 
       console.error('room:start error:', err);
     }
   });
+
+  // Instant one-click session & data shredding
+  socket.on('room:destroy', async ({ roomId }: { roomId?: string }) => {
+    try {
+      const targetRoomId = roomId || socket.roomId;
+      if (!targetRoomId) return;
+
+      io.to(targetRoomId).emit('room:destroyed', {
+        message: 'Seluruh data sesi, foto, dan metadata telah dihapus secara permanen dari server.',
+      });
+
+      await roomService.destroyRoomNow(targetRoomId);
+      console.log(`[Privacy WS] Room ${targetRoomId} destroyed via socket.`);
+    } catch (err) {
+      console.error('room:destroy error:', err);
+    }
+  });
 }
 
 export function handleDisconnect(io: Server, socket: AppSocket, baseUrl: string): void {

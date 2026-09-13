@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
-import { stopLocalStream, closePeerConnection } from '@/lib/webrtc';
+import { stopLocalStream, stopVideoOnly, closePeerConnection } from '@/lib/webrtc';
 import {
   FrameLockedPayload, PairedShot, Participant, Room,
   RoomStatePayload, RenderReadyPayload, VoteStatus, VoteStatusPayload
@@ -20,6 +20,7 @@ import { resolveMediaUrl, getServerUrl } from '@/lib/config';
 import { useLanguage } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import ConnectionBanner from './ConnectionBanner';
+import SnapSyncLogo from './SnapSyncLogo';
 
 interface RoomPageProps {
   code: string;
@@ -48,9 +49,12 @@ export default function RoomPage({ code }: RoomPageProps) {
   const [takingLong, setTakingLong] = useState(false);
   const joinedRef = useRef(false);
 
-  // Ensure camera hardware and streams are turned off when outside of capturing phase
+  // Smart media lifecycle: turn off physical camera sensor/LED during frame & photo selection,
+  // while keeping microphone audio live so friends can discuss in Duo/Group mode.
   useEffect(() => {
-    if (phase !== 'capturing') {
+    if (phase === 'frame_selection' || phase === 'photo_selection') {
+      stopVideoOnly();
+    } else if (phase !== 'capturing') {
       stopLocalStream();
     }
   }, [phase]);
@@ -147,6 +151,12 @@ export default function RoomPage({ code }: RoomPageProps) {
       setPhase('completed');
     });
     socket.on('error', onError);
+    socket.on('room:destroyed', ({ message }: { message?: string }) => {
+      if (!active) return;
+      stopLocalStream();
+      alert(message || 'Seluruh data sesi, foto, dan histori telah dihapus secara permanen dari server.');
+      router.push('/');
+    });
 
     async function initRoomAndJoin() {
       try {
@@ -168,11 +178,13 @@ export default function RoomPage({ code }: RoomPageProps) {
         const existingToken = localStorage.getItem(`token_${code}`);
         const existingName = localStorage.getItem(`name_${code}`);
         const existingPin = localStorage.getItem(`pin_${code}`) || '';
+        const isRoomSolo = data.room?.capacity === 1 || data.room?.settings?.mode === 'solo';
+        const effectiveName = existingName || (isRoomSolo ? 'Solo' : '');
 
-        // If we already have the name and valid PIN if required:
-        if (existingName && (!roomRequiresPin || existingPin.trim().length >= 4)) {
-          setDisplayName(existingName);
-          setNameInput(existingName);
+        // If we already have the name (or it is solo mode) and valid PIN if required:
+        if (effectiveName && (!roomRequiresPin || existingPin.trim().length >= 4)) {
+          setDisplayName(effectiveName);
+          setNameInput(effectiveName);
           if (existingPin) setPinInput(existingPin);
 
           const emitJoin = () => {
@@ -180,7 +192,7 @@ export default function RoomPage({ code }: RoomPageProps) {
             joinedRef.current = true;
             socket.emit('room:join', {
               roomCode: code,
-              displayName: existingName,
+              displayName: effectiveName,
               sessionToken: existingToken || undefined,
               pin: existingPin.trim() || undefined,
             });
@@ -349,14 +361,15 @@ export default function RoomPage({ code }: RoomPageProps) {
 
   if (phase === 'loading') {
     return (
-      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '24px', position: 'relative' }}>
+      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', padding: '24px', position: 'relative' }}>
         <ConnectionBanner />
-        <div className="spinner" style={{ width: '36px', height: '36px', borderWidth: '3px' }} />
-        <div style={{ textAlign: 'center', maxWidth: '360px' }}>
-          <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+        <SnapSyncLogo size={72} />
+        <div className="spinner" style={{ width: '40px', height: '40px', borderWidth: '3.5px' }} />
+        <div style={{ textAlign: 'center', maxWidth: '380px' }}>
+          <p style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
             {t('connectingRoom', { code })}
           </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
             {takingLong ? t('connectingTakingLong') : t('connectingWaitHelp')}
           </p>
         </div>
@@ -440,7 +453,7 @@ export default function RoomPage({ code }: RoomPageProps) {
     if (phase === 'capturing') {
       return (
         <>
-          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} room={room} />
           <CapturePhase
             room={room}
             participants={participants}
@@ -455,7 +468,7 @@ export default function RoomPage({ code }: RoomPageProps) {
     if (phase === 'frame_selection') {
       return (
         <>
-          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} room={room} />
           <FrameSelection
             room={room}
             participants={participants}
@@ -471,7 +484,7 @@ export default function RoomPage({ code }: RoomPageProps) {
     if (phase === 'photo_selection') {
       return (
         <>
-          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} room={room} />
           <PhotoSelection
             room={room}
             participants={participants}
@@ -500,7 +513,7 @@ export default function RoomPage({ code }: RoomPageProps) {
     if (phase === 'completed') {
       return (
         <>
-          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} />
+          <StepHeader roomCode={code} status={room.status} participants={participants} myParticipantId={myParticipantId} room={room} />
           <ResultPage
             room={room}
             participants={participants}
@@ -524,7 +537,7 @@ export default function RoomPage({ code }: RoomPageProps) {
     <>
       <ConnectionBanner />
       {phaseContent}
-      {room && (
+      {room && room.capacity > 1 && room.settings?.mode !== 'solo' && (
         <RoomChat
           room={room}
           participants={participants}

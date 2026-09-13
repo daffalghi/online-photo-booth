@@ -86,12 +86,46 @@ router.get('/:code/frames', async (_req, res) => {
 });
 
 router.get('/:code/render', async (req, res) => {
-  const room = await roomService.getRoomByCode(req.params.code.toUpperCase());
+  const code = (req.params.code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) return res.status(400).json({ error: 'Invalid room code format' });
+  const room = await roomService.getRoomByCode(code);
   if (!room) return res.status(404).json({ error: 'Room not found' });
   const render = await roomService.getRender(room.id);
   if (!render) return res.status(404).json({ error: 'No render found' });
   const baseUrl = process.env.SERVER_URL || 'http://localhost:3001';
   res.json({ downloadUrlPng: `${baseUrl}/renders/${render.output_key}` });
+});
+
+/**
+ * Instant Session Destruction Endpoint:
+ * Allows user to one-click permanently shred and delete all photos, renders, and session data.
+ */
+router.post('/:code/destroy', async (req, res) => {
+  try {
+    const code = (req.params.code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,8}$/.test(code)) {
+      return res.status(400).json({ error: 'Invalid room code format' });
+    }
+    const room = await roomService.getRoomByCode(code);
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found or already deleted' });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(room.id).emit('room:destroyed', {
+        message: 'Seluruh data sesi, foto, dan metadata telah dihapus secara permanen dari server.',
+      });
+    }
+
+    await roomService.destroyRoomNow(room.id);
+    console.log(`[Privacy] Room ${room.code} (${room.id}) and all associated files shredded by user request.`);
+
+    res.json({ success: true, message: 'Seluruh data sesi dan foto berhasil dihapus permanen.' });
+  } catch (err: unknown) {
+    console.error('POST /:code/destroy error:', err);
+    res.status(500).json({ error: 'Gagal menghapus data sesi' });
+  }
 });
 
 export default router;

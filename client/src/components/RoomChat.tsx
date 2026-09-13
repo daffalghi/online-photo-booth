@@ -107,7 +107,8 @@ export default function RoomChat({ room, participants, myParticipantId, socket }
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  // If in solo mode and alone, chat is less critical, but still available for test/notes
+  if (isSolo) return null;
+
   return (
     <aside aria-label="Room Chat" style={{ position: 'fixed', bottom: 'calc(16px + var(--sab, 0px))', right: 'calc(16px + var(--sar, 0px))', zIndex: 1000 }}>
       {/* Floating Chat Button (When Closed) */}

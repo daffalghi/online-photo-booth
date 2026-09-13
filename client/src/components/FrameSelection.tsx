@@ -4,8 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room, VoteStatus } from '@/types';
 import { FRAME_TEMPLATES, ExtendedFrameTemplate, fetchAllFrameTemplates } from '@/lib/frameTemplates';
-import { stopLocalStream } from '@/lib/webrtc';
-import { CheckIcon, PaletteIcon, ClockIcon, UploadIcon } from './Icons';
+import { stopVideoOnly, isMicEnabled, toggleMic, subscribeMicState } from '@/lib/webrtc';
+import { CheckIcon, PaletteIcon, ClockIcon, UploadIcon, MicIcon, MicOffIcon } from './Icons';
 import UploadFrameModal from './UploadFrameModal';
 
 interface FrameSelectionProps {
@@ -35,11 +35,19 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
   const [activeCategory, setActiveCategory] = useState<'all' | 'custom' | '1x3' | '1x4' | '2x2' | '2x3'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [micOn, setMicOn] = useState(isMicEnabled());
 
-  // Guarantee camera hardware is turned off in frame selection
+  // Physically stop camera video hardware (LED off), but preserve microphone audio track for Duo/Group discussion
   useEffect(() => {
-    stopLocalStream();
+    stopVideoOnly();
+    const unsub = subscribeMicState(setMicOn);
+    return () => unsub();
   }, []);
+
+  const handleToggleMic = async () => {
+    const next = await toggleMic();
+    setMicOn(next);
+  };
 
   // Dynamically fetch all shared custom frames and merge with built-ins
   useEffect(() => {
@@ -138,6 +146,39 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
         </p>
       </div>
 
+      {/* Voice Call Bar (Duo & Group mode communication with camera off) */}
+      {!isSolo && (
+        <div className="voice-call-bar">
+          <div className="voice-call-info">
+            <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span className="audio-wave-dot" />
+              Obrolan Suara Aktif
+            </span>
+            <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+              Kamera telah dimatikan. Mikrofon tetap aktif agar Anda dapat berdiskusi memilih frame.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleMic}
+            className={`subcam-btn ${micOn ? 'subcam-btn-active' : 'subcam-btn-muted'}`}
+            id="frame-mic-toggle-btn"
+          >
+            {micOn ? (
+              <>
+                <MicIcon size={16} />
+                <span>Mic Nyala</span>
+              </>
+            ) : (
+              <>
+                <MicOffIcon size={16} />
+                <span>Mic Mati</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Vote Status Bar */}
       <div className="glass-card" style={{ padding: '10px 18px', display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
         {participants.map((p) => {
@@ -225,7 +266,7 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
             placeholder="Cari frame…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: '100%', maxWidth: '180px', padding: '7px 12px', fontSize: '12px' }}
+            style={{ flex: '1 1 140px', minWidth: '120px', padding: '7px 12px', fontSize: '12px' }}
           />
         </div>
       </div>

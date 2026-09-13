@@ -1,12 +1,13 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room } from '@/types';
 import { FRAME_TEMPLATES } from '@/lib/frameTemplates';
 import { compositePreview } from '@/lib/composite';
-import { DownloadIcon, CopyIcon, CheckIcon, PlusIcon, HomeIcon, PaletteIcon } from './Icons';
+import { DownloadIcon, CopyIcon, CheckIcon, PlusIcon, HomeIcon, PaletteIcon, TrashIcon, ShieldCheckIcon } from './Icons';
 import { getServerUrl } from '@/lib/config';
 import CreatorCard from './CreatorCard';
 
@@ -29,10 +30,13 @@ export default function ResultPage({
   customization,
   socket,
 }: ResultPageProps) {
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const [compositing, setCompositing] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   const template = FRAME_TEMPLATES.find((t) => t.id === frameTemplateId) ?? FRAME_TEMPLATES[0];
   const accentColor = customization?.accentColor || template.accent_color;
@@ -114,6 +118,26 @@ export default function ResultPage({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function handleDestroySession() {
+    setIsDeleting(true);
+    try {
+      if (socket) {
+        socket.emit('room:destroy', { roomId: room.id });
+      }
+      await fetch(`${getServerUrl()}/api/rooms/${room.code}/destroy`, {
+        method: 'POST',
+      });
+      alert('Seluruh data sesi, foto, dan histori Anda telah dihapus secara permanen dari server.');
+      router.push('/');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menghapus data sesi. Namun file akan otomatis terhapus dalam 2 jam.');
+    } finally {
+      setIsDeleting(false);
+      setShowConfirmDelete(false);
+    }
   }
 
   return (
@@ -248,6 +272,60 @@ export default function ResultPage({
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
                 Arahkan kamera smartphone ke QR code di samping untuk membuka dan menyimpan gambar strip foto secara langsung.
               </p>
+            </div>
+          </div>
+
+          {/* Privacy & Instant Hard Deletion Card */}
+          <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'rgba(16, 185, 129, 0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-emerald)' }}>
+              <ShieldCheckIcon size={20} />
+              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Jaminan Keamanan & Privasi Data</h3>
+            </div>
+            <ul style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, paddingLeft: '16px', margin: 0 }}>
+              <li><strong>Penghapusan Otomatis (30 Menit):</strong> Foto dan data sesi otomatis dimusnahkan secara permanen dari server dalam 30 menit setelah sesi selesai demi menjaga privasi.</li>
+              <li><strong>Tanpa Data Pribadi:</strong> Sistem tidak meminta email, nama lengkap, nomor telepon, atau akun pribadi apa pun.</li>
+              <li><strong>Enkripsi P2P Langsung:</strong> Panggilan video dan audio mengalir langsung antar perangkat (WebRTC) tanpa direkam server.</li>
+            </ul>
+
+            {/* Instant Hard Deletion Button */}
+            <div style={{ marginTop: '4px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+              {!showConfirmDelete ? (
+                <button
+                  type="button"
+                  className="btn btn-danger btn-md"
+                  onClick={() => setShowConfirmDelete(true)}
+                  id="instant-wipe-btn"
+                  style={{ width: '100%', fontSize: '13px', fontWeight: 700 }}
+                >
+                  <TrashIcon size={16} /> Hapus Seluruh Data Sesi Sekarang
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                  <p style={{ fontSize: '12px', color: '#fca5a5', margin: 0, fontWeight: 600 }}>
+                    Apakah Anda yakin ingin memusnahkan semua foto dan riwayat sesi ini dari server sekarang?
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={handleDestroySession}
+                      disabled={isDeleting}
+                      id="confirm-wipe-btn"
+                      style={{ flex: 1 }}
+                    >
+                      {isDeleting ? 'Menghapus…' : 'Ya, Hapus Permanen Sekarang'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setShowConfirmDelete(false)}
+                      disabled={isDeleting}
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

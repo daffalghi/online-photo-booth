@@ -84,11 +84,10 @@ export function getCanvasLayout(template: ExtendedFrameTemplate, isSolo = false)
     };
   }
 
-  // ── 0. 1x3 (3-Cut Strip: Single Strip for Solo, Twin Strip for Duo) ──────────
+  // ── 0. 1x3 (3-Cut Photostrip: 1 Column x 3 Rows) ──────────
   if (cat === '1x3' || template.layout_type === '1x3') {
     const singleW = fW;
     const singleH = fH;
-    const gap = Math.round(singleW * 0.05);
 
     const fallbackBoxes: CutoutBox[] = [
       { x: singleW * 0.07, y: singleH * 0.04, width: singleW * 0.86, height: singleH * 0.28 },
@@ -104,45 +103,23 @@ export function getCanvasLayout(template: ExtendedFrameTemplate, isSolo = false)
       height: b.height,
     }));
 
-    // In Solo mode, return 1 single strip (no right strip / no twin strip)
-    if (isSolo) {
-      return {
-        width: singleW,
-        height: singleH,
-        leftBoxes,
-        rightBoxes: [],
-        overlayUrl,
-        isTwinStrip: false,
-        singleStripWidth: singleW,
-        singleStripHeight: singleH,
-      };
-    }
-
-    const rightBoxes: FrameBox[] = actualBoxes.slice(0, 3).map((b) => ({
-      x: b.x + singleW + gap,
-      y: b.y,
-      width: b.width,
-      height: b.height,
-    }));
-
     return {
-      width: singleW * 2 + gap,
+      width: singleW,
       height: singleH,
       leftBoxes,
-      rightBoxes,
+      rightBoxes: [],
       overlayUrl,
-      isTwinStrip: true,
+      isTwinStrip: false,
       singleStripWidth: singleW,
       singleStripHeight: singleH,
-      gap,
+      gap: 0,
     };
   }
 
-  // ── 1. 1x4 (4-Cut Strip: Single Strip for Solo, Twin Strip for Duo) ──────────
+  // ── 1. 1x4 (4-Cut Photostrip: 1 Column x 4 Rows) ──────────
   if (cat === '1x4' || template.layout_type === 'duo_strips_4' || template.layout_type === 'strip4') {
     const singleW = fW;
     const singleH = fH;
-    const gap = Math.round(singleW * 0.05);
 
     // Fallback boxes if frame had no detected cutouts
     const fallbackBoxes: CutoutBox[] = [
@@ -160,37 +137,16 @@ export function getCanvasLayout(template: ExtendedFrameTemplate, isSolo = false)
       height: b.height,
     }));
 
-    // In Solo mode, return 1 single strip (no right strip / no twin strip)
-    if (isSolo) {
-      return {
-        width: singleW,
-        height: singleH,
-        leftBoxes,
-        rightBoxes: [],
-        overlayUrl,
-        isTwinStrip: false,
-        singleStripWidth: singleW,
-        singleStripHeight: singleH,
-      };
-    }
-
-    const rightBoxes: FrameBox[] = actualBoxes.slice(0, 4).map((b) => ({
-      x: b.x + singleW + gap,
-      y: b.y,
-      width: b.width,
-      height: b.height,
-    }));
-
     return {
-      width: singleW * 2 + gap,
+      width: singleW,
       height: singleH,
       leftBoxes,
-      rightBoxes,
+      rightBoxes: [],
       overlayUrl,
-      isTwinStrip: true,
+      isTwinStrip: false,
       singleStripWidth: singleW,
       singleStripHeight: singleH,
-      gap,
+      gap: 0,
     };
   }
 

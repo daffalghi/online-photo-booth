@@ -7,6 +7,9 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import fs from 'fs';
 
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
 import { initDb } from './db';
 import { setupSocketIO } from './socket';
 import roomsRouter from './routes/rooms';
@@ -19,6 +22,42 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
 
 const app = express();
+
+// Anti-Hacker Security Headers via Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", 'data:', 'blob:', '*'],
+      mediaSrc: ["'self'", 'blob:', 'data:'],
+      connectSrc: ["'self'", 'wss:', 'ws:', 'https:', 'http:'],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  xFrameOptions: { action: 'deny' },
+}));
+
+// Global API rate limiter (protects against DDoS, scraping, and brute-force)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 400,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Terlalu banyak permintaan dari IP ini, silakan coba beberapa saat lagi.' },
+});
+app.use('/api/', apiLimiter);
+
+// Strict rate limiter for room creation
+const createRoomLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Batas pembuatan room tercapai. Silakan coba 15 menit lagi.' },
+});
 
 // Normalize /socket.io paths so stripped trailing slashes never 404
 app.use((req, _res, next) => {
@@ -34,9 +73,17 @@ app.use(express.urlencoded({ extended: true }));
 
 [UPLOADS_DIR, RENDERS_DIR].forEach((dir) => { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); });
 
-app.use('/uploads', express.static(UPLOADS_DIR));
-app.use('/renders', express.static(RENDERS_DIR));
-app.use('/api/rooms', roomsRouter);
+// Serve static photos & renders with security options (no directory index, strictly cached)
+app.use('/uploads', express.static(UPLOADS_DIR, { dotfiles: 'ignore', index: false }));
+app.use('/renders', express.static(RENDERS_DIR, { dotfiles: 'ignore', index: false }));
+
+app.use('/api/rooms', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/') {
+    return createRoomLimiter(req, res, next);
+  }
+  next();
+}, roomsRouter);
+
 app.use('/api/frames', framesRouter);
 app.get('/health', (req, res) => {
   const isEncrypted = 'encrypted' in req.socket && Boolean((req.socket as import('tls').TLSSocket).encrypted);
@@ -98,8 +145,8 @@ setupSocketIO(io, SERVER_URL);
 
 setInterval(async () => {
   const cleaned = await cleanupExpiredRooms();
-  if (cleaned > 0) console.log(`[Cleanup] Successfully purged ${cleaned} expired room(s) and associated photo files`);
-}, 10 * 60 * 1000);
+  if (cleaned > 0) console.log(`[Privacy Cleanup] Successfully purged ${cleaned} expired room(s) and associated photo files`);
+}, 5 * 60 * 1000);
 
 async function main() {
   await initDb();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CameraIcon,
@@ -17,6 +17,7 @@ import { getServerUrl } from '@/lib/config';
 import { useLanguage } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import CreatorCard from './CreatorCard';
+import SnapSyncLogo from './SnapSyncLogo';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -25,6 +26,19 @@ export default function LandingPage() {
   const [joinCode, setJoinCode] = useState('');
   const [checkingRoom, setCheckingRoom] = useState(false);
   const [mainError, setMainError] = useState('');
+  const [navigatingRoom, setNavigatingRoom] = useState<string | null>(null);
+
+  // ─── Direct URL Query Parameter Handler ──────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get('r') || params.get('room') || params.get('join');
+    if (r && r.trim().length >= 4) {
+      const code = r.trim().toUpperCase();
+      setNavigatingRoom(code);
+      router.replace(`/room/${code}`);
+    }
+  }, [router]);
 
   // ─── Modal Create Room State ─────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -43,8 +57,42 @@ export default function LandingPage() {
   const [joinModalError, setJoinModalError] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
 
-  // Open Create Room Modal
-  function handleOpenCreateModal(mode: 'solo' | 'duo' | 'group' = selectedMode) {
+  // Instant 1-Click Create for Solo Mode
+  async function handleInstantCreateSolo() {
+    setCreateLoading(true);
+    setMainError('');
+    try {
+      const res = await fetch(`${getServerUrl()}/api/rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'solo',
+          shotCount: 4,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal membuat sesi solo');
+
+      const roomCode = data.room.code;
+      localStorage.setItem(`host_${roomCode}`, '1');
+      localStorage.setItem(`name_${roomCode}`, 'Solo');
+
+      setNavigatingRoom(roomCode);
+      router.push(`/room/${roomCode}`);
+    } catch (e: unknown) {
+      setNavigatingRoom(null);
+      setMainError(e instanceof Error ? e.message : 'Gagal membuat sesi solo');
+      setCreateLoading(false);
+    }
+  }
+
+  // Open Create Room Modal (or 1-Click Instant Start for Solo)
+  async function handleOpenCreateModal(mode: 'solo' | 'duo' | 'group' = selectedMode) {
+    if (mode === 'solo') {
+      await handleInstantCreateSolo();
+      return;
+    }
     setCreateMode(mode);
     setCreatePin('');
     setCreateName('');
@@ -52,9 +100,9 @@ export default function LandingPage() {
     setShowCreateModal(true);
   }
 
-  // Confirm Create Room
+  // Confirm Create Room (for Duo and Group)
   async function handleConfirmCreate() {
-    const trimmedName = createName.trim();
+    const trimmedName = createName.trim() || (createMode === 'solo' ? 'Solo' : '');
     if (!trimmedName) {
       setCreateError(t('nameRequiredError'));
       return;
@@ -92,11 +140,12 @@ export default function LandingPage() {
         localStorage.setItem(`pin_${roomCode}`, cleanedPin);
       }
 
+      setNavigatingRoom(roomCode);
       setShowCreateModal(false);
       router.push(`/room/${roomCode}`);
     } catch (e: unknown) {
+      setNavigatingRoom(null);
       setCreateError(e instanceof Error ? e.message : 'Gagal membuat room');
-    } finally {
       setCreateLoading(false);
     }
   }
@@ -148,11 +197,13 @@ export default function LandingPage() {
       }
     }
 
+    setJoinLoading(true);
     localStorage.setItem(`name_${targetJoinCode}`, trimmedName);
     if (cleanedPin) {
       localStorage.setItem(`pin_${targetJoinCode}`, cleanedPin);
     }
 
+    setNavigatingRoom(targetJoinCode);
     setShowJoinModal(false);
     router.push(`/room/${targetJoinCode}`);
   }
@@ -168,22 +219,12 @@ export default function LandingPage() {
       <div style={{ width: '100%', maxWidth: '680px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '22px', position: 'relative', zIndex: 1 }}>
         
         {/* Brand Header */}
-        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{
-            width: '56px', height: '56px', borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,94,151,0.2), rgba(139,92,246,0.2))',
-            border: '1px solid rgba(255,94,151,0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--accent-pink)', marginBottom: '14px',
-            boxShadow: '0 0 24px rgba(255,94,151,0.25)'
-          }}>
-            <CameraIcon size={28} />
-          </div>
-
-          <h1 style={{ fontSize: '36px', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15 }}>
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <SnapSyncLogo size={68} />
+          <h1 style={{ fontSize: '38px', fontWeight: 850, letterSpacing: '-0.03em', lineHeight: 1.15, marginTop: '6px' }}>
             Snap<span className="gradient-text">Sync</span>
           </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px', maxWidth: '520px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px', maxWidth: '520px', lineHeight: 1.5 }}>
             {t('brandSubtitle')}
           </p>
         </div>
@@ -204,7 +245,7 @@ export default function LandingPage() {
             <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '10px', letterSpacing: '0.04em' }}>
               {t('chooseMode')}
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <div className="mode-switcher-grid">
               {/* Solo Mode Button */}
               <button
                 type="button"
@@ -331,18 +372,27 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Launch Room Button -> Opens Creation Modal */}
+          {/* Launch Room Button -> Instant Start for Solo, Modal for Duo/Group */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button
               className="btn btn-primary btn-lg"
               onClick={() => handleOpenCreateModal(selectedMode)}
+              disabled={createLoading || navigatingRoom !== null}
               id="create-room-btn"
               style={{
                 width: '100%',
                 fontSize: '15px',
               }}
             >
-              <CameraIcon size={18} /> {selectedMode === 'solo' ? t('btnCreateSolo') : selectedMode === 'duo' ? t('btnCreateDuo') : t('btnCreateGroup')}
+              {createLoading && selectedMode === 'solo' ? (
+                <>
+                  <span className="spinner" /> Menyiapkan Studio Solo…
+                </>
+              ) : (
+                <>
+                  <CameraIcon size={18} /> {selectedMode === 'solo' ? t('btnCreateSolo') : selectedMode === 'duo' ? t('btnCreateDuo') : t('btnCreateGroup')}
+                </>
+              )}
             </button>
           </div>
 
@@ -703,6 +753,42 @@ export default function LandingPage() {
                 {t('btnEnterRoom')} <ArrowRightIcon size={15} />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── FULLSCREEN TRANSITION OVERLAY: PREVENTS LANDING FLASH ─────── */}
+      {navigatingRoom && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(8, 9, 16, 0.96)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            gap: '20px',
+            animation: 'fadeIn 0.18s ease-out',
+          }}
+        >
+          <SnapSyncLogo size={72} />
+          <div className="spinner" style={{ width: '40px', height: '40px', borderWidth: '3.5px' }} />
+          <div style={{ maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', margin: 0 }}>
+              {t('btnPreparing')}
+            </h2>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              Menyiapkan studio photobooth untuk sesi{' '}
+              <strong style={{ color: 'var(--accent-pink)', letterSpacing: '0.08em', fontFamily: 'monospace' }}>
+                {navigatingRoom}
+              </strong>…
+            </p>
           </div>
         </div>
       )}

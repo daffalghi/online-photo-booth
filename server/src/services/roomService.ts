@@ -26,9 +26,11 @@ const DEFAULT_SETTINGS: RoomSettings = {
   layout: 'strip3',
 };
 
-// 3 Days TTL (Auto-cleanup deletes all rooms and disk photo files older than 3 days)
-const ROOM_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-const COMPLETED_ROOM_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+// Automatic Privacy Deletion:
+// 2 Hours Room TTL (Auto-cleanup deletes all rooms and disk photo files older than 2 hours)
+// 30 Minutes Post-Completion TTL (Wipes session shortly after final photo render)
+const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
+const COMPLETED_ROOM_TTL_MS = 30 * 60 * 1000;
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -452,6 +454,44 @@ export async function cleanupExpiredRooms(): Promise<number> {
   const deletedCount = await knex('rooms').whereIn('id', expiredIds).del();
 
   return deletedCount;
+}
+
+/**
+ * Instant Hard Deletion:
+ * Immediately shreds all raw photos, composite renders, and database records for a specific room.
+ */
+export async function destroyRoomNow(roomId: string): Promise<boolean> {
+  try {
+    // 1. Delete all raw uploaded photo files on disk
+    const photos = await knex<PhotoRow>('photos').where('room_id', roomId);
+    for (const p of photos) {
+      if (p.storage_key) {
+        const filePath = path.join(UPLOADS_DIR, p.storage_key);
+        await fs.promises.unlink(filePath).catch(() => {});
+      }
+    }
+
+    // 2. Delete all final composite render files on disk
+    const renders = await knex<FinalRenderRow>('final_renders').where('room_id', roomId);
+    for (const r of renders) {
+      if (r.output_key) {
+        const filePath = path.join(RENDERS_DIR, r.output_key);
+        await fs.promises.unlink(filePath).catch(() => {});
+      }
+    }
+
+    // 3. Delete database records
+    await knex('final_renders').where('room_id', roomId).del();
+    await knex('votes').where('room_id', roomId).del();
+    await knex('photos').where('room_id', roomId).del();
+    await knex('participants').where('room_id', roomId).del();
+    await knex('rooms').where('id', roomId).del();
+
+    return true;
+  } catch (err) {
+    console.error(`[Privacy] Error destroying room ${roomId}:`, err);
+    return false;
+  }
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────

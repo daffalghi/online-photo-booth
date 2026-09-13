@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room, RoundStatus } from '@/types';
-import { captureFrame, FilterType } from '@/lib/capture';
+import { captureFrame, FilterType, FILTER_CONFIGS } from '@/lib/capture';
 import {
   getLocalStream,
   stopLocalStream,
@@ -13,8 +13,28 @@ import {
   subscribeRemoteStreams,
   toggleMic,
   isMicEnabled,
+  toggleCamera,
+  isCameraEnabled,
+  flipCamera,
+  subscribeMicState,
+  subscribeCameraState,
 } from '@/lib/webrtc';
-import { CameraIcon, CheckIcon, RefreshCwIcon, PlusIcon, SlidersIcon, ClockIcon, ArrowRightIcon, UserIcon, MicIcon, MicOffIcon, CrownIcon } from './Icons';
+import {
+  CameraIcon,
+  CameraOffIcon,
+  FlipCameraIcon,
+  CheckIcon,
+  RefreshCwIcon,
+  PlusIcon,
+  SlidersIcon,
+  ClockIcon,
+  ArrowRightIcon,
+  UserIcon,
+  MicIcon,
+  MicOffIcon,
+  CrownIcon,
+  MirrorIcon,
+} from './Icons';
 import { useLanguage } from '@/lib/i18n';
 
 function RemoteVideoTile({
@@ -71,21 +91,55 @@ function RemoteVideoTile({
 
 const MAX_SHOTS = 10;
 
-const FILTERS: { id: FilterType; label: string }[] = [
-  { id: 'none', label: 'Normal' },
-  { id: 'bw', label: 'B&W' },
-  { id: 'warm', label: 'Warm' },
-  { id: 'vivid', label: 'Vivid' },
-  { id: 'cool', label: 'Cool' },
+export type FilterCategory = 'all' | 'natural' | 'film' | 'bw' | 'mood';
+
+interface FilterItem {
+  id: FilterType;
+  label: string;
+  category: 'natural' | 'film' | 'bw' | 'mood';
+  subtitle: string;
+}
+
+const FILTER_CATEGORIES: { id: FilterCategory; label: string; icon: string }[] = [
+  { id: 'all', label: 'Semua', icon: '✨' },
+  { id: 'natural', label: 'Natural & Glow', icon: '🌟' },
+  { id: 'film', label: 'Film & Retro', icon: '🎞️' },
+  { id: 'bw', label: 'Hitam Putih', icon: '🖤' },
+  { id: 'mood', label: 'Mood & Sinematik', icon: '🎨' },
 ];
 
-const FILTER_CSS: Record<FilterType, string> = {
-  none: '',
-  bw: 'grayscale(100%)',
-  warm: 'sepia(40%) saturate(120%) brightness(105%)',
-  vivid: 'saturate(180%) contrast(110%)',
-  cool: 'hue-rotate(20deg) saturate(80%) brightness(105%)',
-};
+const FILTERS: FilterItem[] = [
+  // Natural & Clean
+  { id: 'none', label: 'Original', category: 'natural', subtitle: 'Kamera asli' },
+  { id: 'clean', label: 'Clean Glow', category: 'natural', subtitle: 'Kulit cerah segar' },
+  { id: 'vivid', label: 'Vivid Pop', category: 'natural', subtitle: 'Warna cerah kontras' },
+  { id: 'matte', label: 'Matte Soft', category: 'natural', subtitle: 'Gaya majalah lembut' },
+  { id: 'soft_blush', label: 'Soft Blush', category: 'natural', subtitle: 'Rona pipi hangat' },
+
+  // Film & Analog
+  { id: 'warm', label: 'Warm Glow', category: 'film', subtitle: 'Hangat sore hari' },
+  { id: 'vintage', label: 'Vintage 90s', category: 'film', subtitle: 'Analog 90-an autentik' },
+  { id: 'polaroid', label: 'Polaroid', category: 'film', subtitle: 'Cahaya instan retro' },
+  { id: 'kodak', label: 'Kodak Gold', category: 'film', subtitle: 'Emas rol film ikonik' },
+  { id: 'fuji', label: 'Fuji Provia', category: 'film', subtitle: 'Tone sejuk sinematik' },
+  { id: 'nostalgia', label: 'Nostalgia', category: 'film', subtitle: 'Memori klasik pudar' },
+
+  // Monokrom & Noir
+  { id: 'bw', label: 'Classic B&W', category: 'bw', subtitle: 'Hitam putih seimbang' },
+  { id: 'noir', label: 'Deep Noir', category: 'bw', subtitle: 'Kontras film bioskop' },
+  { id: 'silver', label: 'Silver Halide', category: 'bw', subtitle: 'Perak monokrom halus' },
+  { id: 'sepia', label: 'Sepia Antique', category: 'bw', subtitle: 'Cokelat klasik antik' },
+
+  // Mood & Sinematik
+  { id: 'cool', label: 'Cool Breeze', category: 'mood', subtitle: 'Sejuk segar modern' },
+  { id: 'golden', label: 'Golden Hour', category: 'mood', subtitle: 'Sinar mentari magis' },
+  { id: 'cyber', label: 'Cyberpunk', category: 'mood', subtitle: 'Neon futuristik' },
+  { id: 'emerald', label: 'Emerald Teal', category: 'mood', subtitle: 'Film Wong Kar-wai' },
+  { id: 'dramatic', label: 'Moody Drama', category: 'mood', subtitle: 'Tegas & misterius' },
+  { id: 'pastel', label: 'Dreamy Pastel', category: 'mood', subtitle: 'Nuansa mimpi pastel' },
+];
+
+const FILTER_CSS = FILTER_CONFIGS;
 
 interface CapturePhaseProps {
   room: Room;
@@ -100,6 +154,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [filter, setFilter] = useState<FilterType>('none');
+  const [selectedCategory, setSelectedCategory] = useState<FilterCategory>('all');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [countdownKey, setCountdownKey] = useState(0);
   const [showFlash, setShowFlash] = useState(false);
@@ -112,9 +167,47 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [cameraAspect, setCameraAspect] = useState<string>('16/9');
-  const [micOn, setMicOn] = useState(true);
+  const [micOn, setMicOn] = useState(isMicEnabled());
+  const [camOn, setCamOn] = useState(isCameraEnabled());
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [isMirrored, setIsMirrored] = useState(false);
+  const filterRef = useRef<FilterType>(filter);
+  filterRef.current = filter;
+  const mirrorRef = useRef<boolean>(isMirrored);
+  mirrorRef.current = isMirrored;
+  const triggerCaptureRef = useRef<(slotIdx: number) => void>(() => {});
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const captureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const unsubMic = subscribeMicState(setMicOn);
+    const unsubCam = subscribeCameraState((c, f) => {
+      setCamOn(c);
+      setFacingMode(f);
+    });
+    return () => {
+      unsubMic();
+      unsubCam();
+    };
+  }, []);
+
+  const handleToggleMic = async () => {
+    if (isCaptureLocked) return;
+    const next = await toggleMic();
+    setMicOn(next);
+  };
+
+  const handleToggleCam = async () => {
+    if (isCaptureLocked) return;
+    const next = await toggleCamera();
+    setCamOn(next);
+  };
+
+  const handleFlipCam = async () => {
+    if (isCaptureLocked) return;
+    const next = await flipCamera();
+    setFacingMode(next);
+  };
 
   const isSolo = room.capacity === 1 || room.settings?.mode === 'solo';
   const isGroup = room.settings?.mode === 'group' || room.capacity > 2;
@@ -123,6 +216,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const partnerStream = partner ? remoteStreams.get(partner.id) : Array.from(remoteStreams.values())[0];
   const slotIndex = room.currentRoundIndex;
   const roundStatus: RoundStatus = room.currentRoundStatus;
+  const isCaptureLocked = iAmReady || countdown !== null || roundStatus === 'counting_down';
 
   // Bind remote stream to remoteVideoRef in Duo mode
   useEffect(() => {
@@ -263,7 +357,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       captureTimeoutRef.current = setTimeout(() => {
         if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
         countdownIntervalRef.current = null;
-        triggerCapture(si);
+        triggerCaptureRef.current(si);
       }, totalMs);
     };
 
@@ -304,6 +398,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
 
   // ─── Actions ────────────────────────────────────────────────────────────────
   function handleTakePhoto() {
+    if (isCaptureLocked) return;
     setIAmReady(true);
     socket.emit('capture:ready', { roomId: room.id, slotIndex });
   }
@@ -315,17 +410,20 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
 
     if (!localVideoRef.current) return;
     try {
-      const dataUrl = await captureFrame(localVideoRef.current, filter);
+      const activeFilter = filterRef.current;
+      const activeMirror = mirrorRef.current;
+      const dataUrl = await captureFrame(localVideoRef.current, activeFilter, undefined, undefined, activeMirror);
       socket.emit('capture:frameUpload', {
         roomId: room.id,
         slotIndex: currentSlotIndex,
         photoDataUrl: dataUrl,
-        filters: filter !== 'none' ? [filter] : [],
+        filters: activeFilter !== 'none' ? [activeFilter] : [],
       });
     } catch (e) {
       console.error('Capture error:', e);
     }
   }
+  triggerCaptureRef.current = triggerCapture;
 
   function handleKeep() {
     setLocalKeepStatus((prev) => (prev.includes(myParticipantId) ? prev : [...prev, myParticipantId]));
@@ -360,7 +458,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       {showFlash && <div className="camera-flash" />}
 
       {/* Header bar */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+      <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <CameraIcon size={18} color="var(--accent-pink)" />
           <span style={{ fontWeight: 800, fontSize: '15px' }}>
@@ -376,10 +474,8 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
           {!isSolo && (
             <button
               className={`btn btn-sm ${micOn ? 'btn-secondary' : 'btn-danger'}`}
-              onClick={async () => {
-                const nextState = await toggleMic();
-                setMicOn(nextState);
-              }}
+              onClick={handleToggleMic}
+              disabled={isCaptureLocked}
               id="mic-toggle-btn"
               style={{
                 display: 'inline-flex',
@@ -413,7 +509,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       </div>
 
       {camError && (
-        <div style={{ width: '100%', padding: '12px 16px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-md)', color: '#f87171', fontSize: '13px', textAlign: 'center' }}>
+        <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto', padding: '12px 16px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-md)', color: '#f87171', fontSize: '13px', textAlign: 'center' }}>
           {camError}
         </div>
       )}
@@ -421,20 +517,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       {/* Camera Viewfinder Box: Single for Solo, Grid for Group, Dual for Duo */}
       {isSolo ? (
         // ─── SOLO CAMERA VIEW (Centered single camera) ──────────────────────────
-        <div
-          style={{
-            width: '100%',
-            maxWidth: '640px',
-            maxHeight: '52dvh',
-            aspectRatio: cameraAspect,
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            background: '#090a10',
-            border: '1px solid var(--border-subtle)',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.6)',
-            position: 'relative',
-          }}
-        >
+        <div className="camera-view-solo">
           <video
             ref={localVideoRef}
             autoPlay
@@ -447,7 +530,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
               objectFit: 'cover',
               filter: FILTER_CSS[filter],
               display: showPreview ? 'none' : 'block',
-              transform: 'scaleX(-1) translateZ(0)',
+              transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
               backfaceVisibility: 'hidden',
             }}
           />
@@ -510,7 +593,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                         objectFit: 'cover',
                         filter: FILTER_CSS[filter],
                         display: showPreview ? 'none' : 'block',
-                        transform: 'scaleX(-1) translateZ(0)',
+                        transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
                         backfaceVisibility: 'hidden',
                       }}
                     />
@@ -561,7 +644,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
                 {showPreview && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -616,7 +699,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
                 {showPreview && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -664,26 +747,153 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         </div>
       )}
 
+      {/* ── SUB-CAMERA MEDIA CONTROLS BAR (Directly below live camera) ── */}
+      <div className="subcam-bar">
+        <div className="subcam-toggle-group">
+          {/* Mic Toggle Button */}
+          {!isSolo && (
+            <button
+              type="button"
+              onClick={handleToggleMic}
+              disabled={isCaptureLocked}
+              className={`subcam-btn ${micOn ? 'subcam-btn-active' : 'subcam-btn-muted'}`}
+              title={micOn ? 'Matikan Mikrofon' : 'Nyalakan Mikrofon'}
+              id="toggle-mic-btn"
+            >
+              {micOn ? (
+                <>
+                  <span className="audio-wave-dot" />
+                  <MicIcon size={18} />
+                  <span>Mic Nyala</span>
+                </>
+              ) : (
+                <>
+                  <MicOffIcon size={18} />
+                  <span>Mic Mati</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Camera Toggle Button */}
+          <button
+            type="button"
+            onClick={handleToggleCam}
+            disabled={isCaptureLocked}
+            className={`subcam-btn ${camOn ? 'subcam-btn-active' : 'subcam-btn-muted'}`}
+            title={camOn ? 'Matikan Kamera' : 'Nyalakan Kamera'}
+            id="toggle-cam-btn"
+          >
+            {camOn ? (
+              <>
+                <CameraIcon size={18} />
+                <span>Kamera Nyala</span>
+              </>
+            ) : (
+              <>
+                <CameraOffIcon size={18} />
+                <span>Kamera Mati</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Flip Camera Button (mobile/front/rear) */}
+        <div className="subcam-toggle-group">
+          <button
+            type="button"
+            onClick={handleFlipCam}
+            disabled={isCaptureLocked}
+            className="subcam-btn subcam-btn-neutral"
+            title="Ganti Kamera Depan/Belakang"
+            id="flip-cam-btn"
+          >
+            <FlipCameraIcon size={18} />
+            <span>Putar</span>
+          </button>
+        </div>
+
+        {/* Mirror Toggle Button */}
+        <div className="subcam-toggle-group">
+          <button
+            type="button"
+            onClick={() => !isCaptureLocked && setIsMirrored((prev) => !prev)}
+            disabled={isCaptureLocked}
+            className={`subcam-btn ${isMirrored ? 'subcam-btn-active' : 'subcam-btn-neutral'}`}
+            title={isMirrored ? 'Mirror Aktif (Kamera & foto dicerminkan)' : 'Mirror Mati (Kamera & foto orientasi asli)'}
+            id="toggle-mirror-btn"
+          >
+            <MirrorIcon size={18} />
+            <span>{isMirrored ? 'Mirror: On' : 'Mirror: Off'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Controls Card */}
-      <div className="glass-card" style={{ width: '100%', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: '680px', margin: '0 auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         
-        {/* Filter Bar (waiting state) */}
-        {roundStatus === 'waiting_ready' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
-              <SlidersIcon size={14} /> Filter Kamera:
-            </span>
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                className={`btn btn-sm ${filter === f.id ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setFilter(f.id)}
-                id={`filter-${f.id}-btn`}
-                style={{ padding: '5px 12px', fontSize: '12px' }}
-              >
-                {f.label}
-              </button>
-            ))}
+        {/* Filter Bar (waiting state only, disabled/hidden during countdown) */}
+        {roundStatus === 'waiting_ready' && !isCaptureLocked && (
+          <div className="filter-bar-container">
+            {/* Filter Header & Active Indicator */}
+            <div className="filter-header-row">
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <SlidersIcon size={14} color="var(--primary)" />
+                Filter Kamera
+              </span>
+              <span className="badge badge-neutral" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                Aktif: <strong style={{ color: 'var(--primary)', marginLeft: '3px' }}>{FILTERS.find((f) => f.id === filter)?.label || 'Original'}</strong>
+              </span>
+            </div>
+
+            {/* Category Tabs */}
+            <div className="filter-category-tabs" role="tablist" aria-label="Kategori Filter">
+              {FILTER_CATEGORIES.map((cat) => {
+                const count = cat.id === 'all' ? FILTERS.length : FILTERS.filter((f) => f.category === cat.id).length;
+                const active = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`filter-category-btn ${active ? 'active' : ''}`}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    role="tab"
+                    aria-selected={active}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    <span style={{ opacity: 0.65, fontSize: '10px' }}>({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Horizontal Filter Strip with Real-time Swatch Previews */}
+            <div className="filter-scroll-strip" role="listbox" aria-label="Pilihan Filter">
+              {FILTERS.filter((f) => selectedCategory === 'all' || f.category === selectedCategory).map((f) => {
+                const active = filter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className={`filter-item-btn ${active ? 'active' : ''}`}
+                    onClick={() => setFilter(f.id)}
+                    id={`filter-${f.id}-btn`}
+                    title={`${f.label} (${f.subtitle})`}
+                    role="option"
+                    aria-selected={active}
+                  >
+                    <div
+                      className="filter-swatch"
+                      style={{
+                        filter: FILTER_CONFIGS[f.id] || 'none',
+                      }}
+                    />
+                    <span style={{ whiteSpace: 'nowrap', lineHeight: 1.2 }}>{f.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

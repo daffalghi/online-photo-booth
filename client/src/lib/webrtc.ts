@@ -140,9 +140,46 @@ export async function getLocalStream(): Promise<MediaStream> {
 }
 
 let micState = true;
+let cameraState = true;
+let currentFacingMode: 'user' | 'environment' = 'user';
+
+const micSubscribers = new Set<(enabled: boolean) => void>();
+const cameraSubscribers = new Set<(enabled: boolean, facingMode: 'user' | 'environment') => void>();
+
+function notifyMicSubscribers() {
+  micSubscribers.forEach((cb) => cb(micState));
+}
+
+function notifyCameraSubscribers() {
+  cameraSubscribers.forEach((cb) => cb(cameraState, currentFacingMode));
+}
+
+export function subscribeMicState(cb: (enabled: boolean) => void): () => void {
+  micSubscribers.add(cb);
+  cb(micState);
+  return () => {
+    micSubscribers.delete(cb);
+  };
+}
+
+export function subscribeCameraState(cb: (enabled: boolean, facingMode: 'user' | 'environment') => void): () => void {
+  cameraSubscribers.add(cb);
+  cb(cameraState, currentFacingMode);
+  return () => {
+    cameraSubscribers.delete(cb);
+  };
+}
 
 export function isMicEnabled(): boolean {
   return micState;
+}
+
+export function isCameraEnabled(): boolean {
+  return cameraState;
+}
+
+export function getCameraFacingMode(): 'user' | 'environment' {
+  return currentFacingMode;
 }
 
 /**
@@ -179,11 +216,128 @@ export async function setMicEnabled(enabled: boolean): Promise<boolean> {
     }
   }
 
+  notifyMicSubscribers();
   return micState;
 }
 
 export async function toggleMic(): Promise<boolean> {
   return await setMicEnabled(!micState);
+}
+
+/**
+ * Toggles camera video transmission on/off without dropping the peer connection or audio stream.
+ */
+export async function setCameraEnabled(enabled: boolean): Promise<boolean> {
+  cameraState = enabled;
+
+  if (localStream) {
+    localStream.getVideoTracks().forEach((track) => {
+      track.enabled = enabled;
+    });
+  }
+
+  const targetVideoTrack = enabled && localStream ? (localStream.getVideoTracks()[0] || null) : null;
+
+  for (const pc of peerConnections.values()) {
+    const senders = pc.getSenders();
+    for (const sender of senders) {
+      if (sender.track?.kind === 'video' || (!sender.track && enabled)) {
+        try {
+          await sender.replaceTrack(targetVideoTrack);
+        } catch (_) {
+          if (sender.track) {
+            sender.track.enabled = enabled;
+          }
+        }
+      }
+    }
+  }
+
+  notifyCameraSubscribers();
+  return cameraState;
+}
+
+export async function toggleCamera(): Promise<boolean> {
+  return await setCameraEnabled(!cameraState);
+}
+
+/**
+ * Flip between front ('user') and rear ('environment') camera on mobile devices.
+ */
+export async function flipCamera(): Promise<'user' | 'environment'> {
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+  if (localStream && navigator?.mediaDevices?.getUserMedia) {
+    try {
+      const oldVideo = localStream.getVideoTracks()[0];
+      if (oldVideo) {
+        oldVideo.stop();
+        localStream.removeTrack(oldVideo);
+        activeLocalTracks.delete(oldVideo);
+      }
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: currentFacingMode,
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+        },
+        audio: false,
+      });
+
+      const newVideo = newStream.getVideoTracks()[0];
+      if (newVideo) {
+        localStream.addTrack(newVideo);
+        activeLocalTracks.add(newVideo);
+        newVideo.addEventListener('ended', () => activeLocalTracks.delete(newVideo));
+
+        for (const pc of peerConnections.values()) {
+          for (const sender of pc.getSenders()) {
+            if (sender.track?.kind === 'video' || !sender.track) {
+              await sender.replaceTrack(newVideo);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[WebRTC] Flip camera failed:', err);
+    }
+  }
+
+  notifyCameraSubscribers();
+  return currentFacingMode;
+}
+
+/**
+ * Stops camera hardware and video tracks ONLY.
+ * Audio tracks and WebRTC audio transmission stay active so users can continue voice discussion!
+ */
+export function stopVideoOnly(): void {
+  if (localStream) {
+    localStream.getVideoTracks().forEach((track) => {
+      try {
+        track.stop();
+        track.enabled = false;
+        activeLocalTracks.delete(track);
+      } catch (_) {}
+    });
+  }
+
+  peerConnections.forEach((pc) => {
+    try {
+      pc.getSenders().forEach((sender) => {
+        if (sender.track?.kind === 'video') {
+          try {
+            sender.track.stop();
+            sender.replaceTrack(null);
+          } catch (_) {}
+        }
+      });
+    } catch (_) {}
+  });
+
+  cameraState = false;
+  notifyCameraSubscribers();
 }
 
 export function stopLocalStream(): void {

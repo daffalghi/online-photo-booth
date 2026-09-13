@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room } from '@/types';
 import { FRAME_TEMPLATES, ExtendedFrameTemplate, getCanvasLayout, CanvasLayoutConfig } from '@/lib/frameTemplates';
-import { stopLocalStream } from '@/lib/webrtc';
+import { stopVideoOnly, isMicEnabled, toggleMic, subscribeMicState } from '@/lib/webrtc';
 import {
   CheckIcon,
   CloseIcon,
@@ -19,6 +19,8 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
   SlidersIcon,
+  MicIcon,
+  MicOffIcon,
 } from './Icons';
 import { resolveMediaUrl } from '@/lib/config';
 
@@ -81,6 +83,18 @@ export default function PhotoSelection({
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [dragOverSlotIndex, setDragOverSlotIndex] = useState<number | null>(null);
+  const [micOn, setMicOn] = useState(isMicEnabled());
+
+  useEffect(() => {
+    stopVideoOnly();
+    const unsub = subscribeMicState(setMicOn);
+    return () => unsub();
+  }, []);
+
+  const handleToggleMic = async () => {
+    const next = await toggleMic();
+    setMicOn(next);
+  };
 
   const me = participants.find((p) => p.id === myParticipantId);
   const partner = participants.find((p) => p.id !== myParticipantId);
@@ -157,10 +171,6 @@ export default function PhotoSelection({
     });
   }, [totalSlots]);
 
-  // Guarantee camera hardware is completely stopped in photo selection
-  useEffect(() => {
-    stopLocalStream();
-  }, []);
 
   // ─── Socket Sync ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -381,6 +391,39 @@ export default function PhotoSelection({
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: '16px', gap: '16px', maxWidth: '1280px', margin: '0 auto', width: '100%' }}>
+      {/* Voice Call Bar (Duo & Group mode communication) */}
+      {!isSolo && (
+        <div className="voice-call-bar">
+          <div className="voice-call-info">
+            <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span className="audio-wave-dot" />
+              Obrolan Suara Aktif
+            </span>
+            <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+              Kamera dimatikan. Mikrofon aktif untuk berkoordinasi menata foto.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleMic}
+            className={`subcam-btn ${micOn ? 'subcam-btn-active' : 'subcam-btn-muted'}`}
+            id="photo-selection-mic-toggle-btn"
+          >
+            {micOn ? (
+              <>
+                <MicIcon size={16} />
+                <span>Mic Nyala</span>
+              </>
+            ) : (
+              <>
+                <MicOffIcon size={16} />
+                <span>Mic Mati</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -420,7 +463,7 @@ export default function PhotoSelection({
               Layout Frame ({assignedCount}/{totalSlots} Terisi)
             </span>
             <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
-              {layout.isTwinStrip ? 'Twin Photostrips' : (isSolo && (template.layout_type.includes('1x') || template.category?.includes('1x')) ? 'Single Strip' : `${totalSlots}-Cut Grid`)}
+              {layout.isTwinStrip ? 'Twin Photostrips' : (template.layout_type?.includes('1x') || template.category?.includes('1x') ? `${totalSlots}-Cut Photostrip` : `${totalSlots}-Cut Grid`)}
             </span>
           </div>
 
@@ -429,8 +472,9 @@ export default function PhotoSelection({
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: layout.isTwinStrip ? '420px' : (isSolo && (template.layout_type.includes('1x') || template.category?.includes('1x')) ? '220px' : '360px'),
+              maxWidth: layout.isTwinStrip ? '420px' : (template.layout_type?.includes('1x') || template.category?.includes('1x')) ? '260px' : '380px',
               aspectRatio: `${layout.width} / ${layout.height}`,
+              margin: '0 auto',
               backgroundColor: '#0c0d14',
               borderRadius: '12px',
               overflow: 'hidden',
@@ -946,7 +990,7 @@ export default function PhotoSelection({
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="photo-selection-actions">
                 <button
                   className="btn btn-secondary btn-lg"
                   onClick={handleChangeTemplate}

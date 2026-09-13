@@ -2,12 +2,20 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SnapSync — Synced Photobooth for Two',
-  description: 'Take synchronized split-screen photobooth photos with anyone, anywhere. Share a QR code, strike a pose together, and download a beautiful memory.',
-  keywords: ['photobooth', 'online photobooth', 'synchronized photos', 'couples photos', 'virtual photobooth'],
+  title: 'SnapSync',
+  description: 'Online photobooth studio interaktif dengan beragam frame estetik. Ambil foto sendiri, berdua, atau rame-rame dalam grup!',
+  keywords: ['photobooth', 'online photobooth', 'synchronized photos', 'virtual photobooth', 'snapsync'],
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+  },
   openGraph: {
-    title: 'SnapSync — Synced Photobooth for Two',
-    description: 'Take synchronized photobooth photos with anyone, from anywhere.',
+    title: 'SnapSync',
+    description: 'Online photobooth studio interaktif dengan beragam frame estetik.',
     type: 'website',
   },
   manifest: '/manifest.json',

@@ -1,27 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { CameraIcon, PaletteIcon, LayoutIcon, DownloadIcon, CopyIcon, CheckIcon, HomeIcon, UsersIcon } from './Icons';
-import { Participant, RoomStatus } from '@/types';
+import { CameraIcon, PaletteIcon, LayoutIcon, DownloadIcon, CopyIcon, CheckIcon, HomeIcon } from './Icons';
+import { Participant, Room, RoomStatus } from '@/types';
 import { useLanguage } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
-
 import ConfirmModal from './ConfirmModal';
+import SnapSyncLogo from './SnapSyncLogo';
 
 interface StepHeaderProps {
   roomCode: string;
   status: RoomStatus;
   participants: Participant[];
   myParticipantId: string;
+  room?: Room;
 }
 
-export default function StepHeader({ roomCode, status, participants, myParticipantId }: StepHeaderProps) {
+export default function StepHeader({ roomCode, status, participants, myParticipantId, room }: StepHeaderProps) {
   const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-
-  const me = participants.find((p) => p.id === myParticipantId);
-  const partner = participants.find((p) => p.id !== myParticipantId);
 
   const STEPS = [
     { key: 'capturing', stepNum: '1', title: t('step1Title'), desc: t('step1Desc'), icon: CameraIcon },
@@ -62,8 +60,9 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
   if (status === 'lobby' || status === 'expired') return null;
 
   return (
-    <header
-      style={{
+    <>
+      <header
+        style={{
         position: 'sticky',
         top: 0,
         zIndex: 50,
@@ -98,25 +97,7 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
             <HomeIcon size={16} />
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div
-              style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #ff5e97, #8b5cf6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 10px rgba(255,94,151,0.4)',
-              }}
-            >
-              <CameraIcon size={14} color="white" />
-            </div>
-            <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '-0.02em' }}>
-              <span className="gradient-text">SnapSync</span>
-            </span>
-          </div>
+          <SnapSyncLogo size={28} showText textSize={15} />
 
           {/* Room Code Badge with Copy */}
           <button
@@ -203,42 +184,12 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
           })}
         </nav>
 
-        {/* Right: Language Switcher & Partner Connection Status */}
+        {/* Right: Language Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <LanguageSwitcher />
-          {partner ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: 'var(--radius-full)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                fontSize: '11.5px',
-              }}
-            >
-              <div
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: partner.connectionStatus === 'connected' ? '#10b981' : '#f59e0b',
-                  boxShadow: partner.connectionStatus === 'connected' ? '0 0 8px #10b981' : 'none',
-                }}
-              />
-              <span style={{ color: 'var(--text-secondary)' }}>
-                {partner.displayName}
-              </span>
-            </div>
-          ) : (
-            <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
-              <UsersIcon size={11} /> Menunggu Partner
-            </span>
-          )}
         </div>
       </div>
+    </header>
 
       <ConfirmModal
         isOpen={showLeaveModal}
@@ -253,7 +204,7 @@ export default function StepHeader({ roomCode, status, participants, myParticipa
         }}
         onCancel={() => setShowLeaveModal(false)}
       />
-    </header>
+    </>
   );
 }
 
