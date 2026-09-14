@@ -223,6 +223,95 @@ function applyPixelFilter(data: Uint8ClampedArray, filter: FilterType) {
     return;
   }
 
+  if (filter === 'matte') {
+    for (let i = 0; i < len; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      let nr = (gray + (r - gray) * 0.92) * 1.05;
+      let ng = (gray + (g - gray) * 0.92) * 1.05;
+      let nb = (gray + (b - gray) * 0.92) * 1.05;
+      data[i] = Math.min(255, Math.max(0, (nr - 128) * 0.92 + 128));
+      data[i + 1] = Math.min(255, Math.max(0, (ng - 128) * 0.92 + 128));
+      data[i + 2] = Math.min(255, Math.max(0, (nb - 128) * 0.92 + 128));
+    }
+    return;
+  }
+
+  if (filter === 'soft_blush') {
+    for (let i = 0; i < len; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const sr = 0.393 * r + 0.769 * g + 0.189 * b;
+      const sg = 0.349 * r + 0.686 * g + 0.168 * b;
+      const sb = 0.272 * r + 0.534 * g + 0.131 * b;
+      let nr = (r * 0.82 + sr * 0.18) * 1.06;
+      let ng = (g * 0.82 + sg * 0.18) * 1.02;
+      let nb = (b * 0.82 + sb * 0.18) * 0.98;
+      const gray = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+      data[i] = Math.min(255, Math.max(0, gray + (nr - gray) * 1.25));
+      data[i + 1] = Math.min(255, Math.max(0, gray + (ng - gray) * 1.25));
+      data[i + 2] = Math.min(255, Math.max(0, gray + (nb - gray) * 1.25));
+    }
+    return;
+  }
+
+  if (filter === 'fuji') {
+    for (let i = 0; i < len; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      let nr = (gray + (r - gray) * 1.15) * 1.04;
+      let ng = (gray + (g - gray) * 1.15) * 1.04;
+      let nb = (gray + (b - gray) * 1.15) * 1.08;
+      data[i] = Math.min(255, Math.max(0, (nr - 128) * 1.12 + 128));
+      data[i + 1] = Math.min(255, Math.max(0, (ng - 128) * 1.12 + 128));
+      data[i + 2] = Math.min(255, Math.max(0, (nb - 128) * 1.12 + 128));
+    }
+    return;
+  }
+
+  if (filter === 'nostalgia') {
+    for (let i = 0; i < len; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const sr = 0.393 * r + 0.769 * g + 0.189 * b;
+      const sg = 0.349 * r + 0.686 * g + 0.168 * b;
+      const sb = 0.272 * r + 0.534 * g + 0.131 * b;
+      let nr = (r * 0.5 + sr * 0.5) * 1.08;
+      let ng = (g * 0.5 + sg * 0.5) * 1.08;
+      let nb = (b * 0.5 + sb * 0.5) * 0.95;
+      data[i] = Math.min(255, Math.max(0, (nr - 128) * 0.92 + 128));
+      data[i + 1] = Math.min(255, Math.max(0, (ng - 128) * 0.92 + 128));
+      data[i + 2] = Math.min(255, Math.max(0, (nb - 128) * 0.92 + 128));
+    }
+    return;
+  }
+
+  if (filter === 'dramatic') {
+    for (let i = 0; i < len; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      let nr = (gray + (r - gray) * 0.75) * 0.95;
+      let ng = (gray + (g - gray) * 0.75) * 0.95;
+      let nb = (gray + (b - gray) * 0.75) * 0.95;
+      data[i] = Math.min(255, Math.max(0, (nr - 128) * 1.35 + 128));
+      data[i + 1] = Math.min(255, Math.max(0, (ng - 128) * 1.35 + 128));
+      data[i + 2] = Math.min(255, Math.max(0, (nb - 128) * 1.35 + 128));
+    }
+    return;
+  }
+
+  if (filter === 'pastel') {
+    for (let i = 0; i < len; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      let nr = (gray + (r - gray) * 1.3) * 1.12;
+      let ng = (gray + (g - gray) * 1.3) * 1.10;
+      let nb = (gray + (b - gray) * 1.3) * 1.14;
+      data[i] = Math.min(255, Math.max(0, (nr - 128) * 0.95 + 128));
+      data[i + 1] = Math.min(255, Math.max(0, (ng - 128) * 0.95 + 128));
+      data[i + 2] = Math.min(255, Math.max(0, (nb - 128) * 0.95 + 128));
+    }
+    return;
+  }
+
   // Default rich boost for other presets
   for (let i = 0; i < len; i += 4) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
@@ -236,12 +325,14 @@ function applyPixelFilter(data: Uint8ClampedArray, filter: FilterType) {
   }
 }
 
+/** Maximum capture dimension to avoid mobile GPU buffer allocation failures (e.g. 4K camera sensors on Android) */
+const MAX_CAPTURE_DIMENSION = 1920;
+
 /**
  * Capture current video frame instantly to canvas.
- * - Always un-mirrored (natural true orientation)
- * - Zero delay after countdown (< 10 ms execution)
- * - Two-tier filter pipeline: applies Canvas 2D filter and direct pixel transformation fallback,
- *   guaranteeing 100% that the filter is baked permanently into the output image bytes.
+ * - Hardware-accelerated Canvas 2D filter baking (instant GPU execution)
+ * - Safe resolution scaling to prevent mobile OOM on ultra-high res sensors
+ * - Direct pixel fallback for legacy browsers without ctx.filter
  */
 export async function captureFrame(
   videoEl: HTMLVideoElement,
@@ -250,8 +341,19 @@ export async function captureFrame(
   targetHeight?: number,
   mirror: boolean = false,
 ): Promise<string> {
-  const vW = videoEl.videoWidth > 0 ? videoEl.videoWidth : 1280;
-  const vH = videoEl.videoHeight > 0 ? videoEl.videoHeight : 720;
+  let vW = videoEl.videoWidth > 0 ? videoEl.videoWidth : 1280;
+  let vH = videoEl.videoHeight > 0 ? videoEl.videoHeight : 720;
+
+  // Scale down if resolution exceeds mobile safety limit while preserving aspect ratio
+  if (!targetWidth && !targetHeight) {
+    const maxDim = Math.max(vW, vH);
+    if (maxDim > MAX_CAPTURE_DIMENSION) {
+      const scale = MAX_CAPTURE_DIMENSION / maxDim;
+      vW = Math.round(vW * scale);
+      vH = Math.round(vH * scale);
+    }
+  }
+
   const width = targetWidth && targetWidth > 0 ? targetWidth : vW;
   const height = targetHeight && targetHeight > 0 ? targetHeight : vH;
 
@@ -264,7 +366,15 @@ export async function captureFrame(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Step 1: Draw video frame onto canvas with optional mirror
+  // Apply native Canvas 2D hardware-accelerated filter before drawing
+  const cssFilter = filter && filter !== 'none' ? FILTER_CONFIGS[filter] : 'none';
+  const hasFilterSupport = 'filter' in (ctx as object);
+
+  if (hasFilterSupport && cssFilter && cssFilter !== 'none') {
+    (ctx as CanvasRenderingContext2D).filter = cssFilter;
+  }
+
+  // Draw video frame onto canvas with optional mirror
   if (mirror) {
     ctx.save();
     ctx.translate(width, 0);
@@ -275,21 +385,23 @@ export async function captureFrame(
     ctx.drawImage(videoEl, 0, 0, width, height);
   }
 
-  // If no filter selected, return image immediately
-  if (!filter || filter === 'none') {
-    return canvas.toDataURL('image/jpeg', 0.98);
+  if (hasFilterSupport) {
+    (ctx as CanvasRenderingContext2D).filter = 'none';
   }
 
-  // Step 2: Apply filter with guaranteed pixel processing
-  try {
-    const imgData = ctx.getImageData(0, 0, width, height);
-    applyPixelFilter(imgData.data, filter);
-    ctx.putImageData(imgData, 0, 0);
-  } catch (err) {
-    console.error('Error applying pixel filter:', err);
+  // If browser does not support ctx.filter natively, use direct pixel transformation fallback
+  const isFilterWorking = hasFilterSupport && cssFilter !== 'none';
+  if (!isFilterWorking && filter && filter !== 'none') {
+    try {
+      const imgData = (ctx as CanvasRenderingContext2D).getImageData(0, 0, width, height);
+      applyPixelFilter(imgData.data, filter);
+      (ctx as CanvasRenderingContext2D).putImageData(imgData, 0, 0);
+    } catch (err) {
+      console.warn('Fallback pixel filter error:', err);
+    }
   }
 
-  return canvas.toDataURL('image/jpeg', 0.98);
+  return canvas.toDataURL('image/jpeg', 0.95);
 }
 
 /** Schedule a capture at a specific server timestamp (ms) */

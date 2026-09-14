@@ -5,7 +5,14 @@ import { handlePhotoSelectionEvents } from './handlers/photoSelection';
 import { handleVoteEvents } from './handlers/vote';
 import { handleChatEvents } from './handlers/chat';
 
+let ioInstance: Server | null = null;
+
+export function getSocketIO(): Server | null {
+  return ioInstance;
+}
+
 export function setupSocketIO(io: Server, baseUrl: string): void {
+  ioInstance = io;
   io.on('connection', (socket) => {
     console.log(`[WS] Client connected: ${socket.id}`);
 

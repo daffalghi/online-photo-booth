@@ -153,6 +153,18 @@ export async function initDb(): Promise<void> {
       t.bigInteger('rendered_at').notNullable();
     });
   }
+
+  // Global Community Custom Backgrounds (Shared for all users, never deleted across rounds)
+  if (!(await knex.schema.hasTable('custom_backgrounds'))) {
+    await knex.schema.createTable('custom_backgrounds', (t) => {
+      t.string('id').primary();
+      t.string('name').notNullable();
+      t.string('storage_key').notNullable();
+      t.string('uploaded_by').notNullable().defaultTo('Komunitas');
+      t.string('uploaded_by_id').nullable();
+      t.bigInteger('created_at').notNullable();
+    });
+  }
 }
 
 export default knex;

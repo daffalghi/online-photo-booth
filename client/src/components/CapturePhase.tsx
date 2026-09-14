@@ -5,6 +5,13 @@ import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room, RoundStatus } from '@/types';
 import { captureFrame, FilterType, FILTER_CONFIGS } from '@/lib/capture';
 import {
+  BACKGROUND_PRESETS,
+  BG_CATEGORIES,
+  VirtualBackground,
+  VirtualBgCategory,
+} from '@/lib/backgroundPresets';
+import { BackgroundRenderController } from '@/lib/backgroundSegmenter';
+import {
   getLocalStream,
   stopLocalStream,
   closePeerConnection,
@@ -15,6 +22,7 @@ import {
   isMicEnabled,
   toggleCamera,
   isCameraEnabled,
+  getActiveLocalStream,
   flipCamera,
   subscribeMicState,
   subscribeCameraState,
@@ -34,8 +42,16 @@ import {
   MicOffIcon,
   CrownIcon,
   MirrorIcon,
+  ImageIcon,
+  DropletIcon,
+  PaletteIcon,
+  MountainIcon,
+  SparklesIcon,
+  UploadIcon,
+  TrashIcon,
 } from './Icons';
 import { useLanguage } from '@/lib/i18n';
+import { getServerUrl } from '@/lib/config';
 
 function RemoteVideoTile({
   stream,
@@ -179,11 +195,273 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const captureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ─── Virtual Background State ──────────────────────────────────────────
+  const virtualCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bgControllerRef = useRef<BackgroundRenderController | null>(null);
+  const [activeToolTab, setActiveToolTab] = useState<'filter' | 'background'>('filter');
+  const [selectedBg, setSelectedBg] = useState<VirtualBackground>(BACKGROUND_PRESETS[0]);
+  const [selectedBgCategory, setSelectedBgCategory] = useState<VirtualBgCategory>('all');
+  const [isUploadingBg, setIsUploadingBg] = useState(false);
+  const [publicBackgrounds, setPublicBackgrounds] = useState<
+    Array<{ id: string; name: string; url: string; uploadedBy: string; uploadedById: string; uploadedAt: number }>
+  >([]);
+  const bgRef = useRef<VirtualBackground>(selectedBg);
+  bgRef.current = selectedBg;
+  const customFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync public community custom backgrounds (shared globally with all users across all rooms)
+  useEffect(() => {
+    // 1. Fetch initial public backgrounds via REST API
+    const loadPublicBackgrounds = async () => {
+      try {
+        const res = await fetch(`${getServerUrl()}/api/backgrounds`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.backgrounds)) {
+            setPublicBackgrounds(data.backgrounds);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch public backgrounds via REST:', err);
+      }
+    };
+    loadPublicBackgrounds();
+
+    // 2. Request via socket
+    socket.emit('capture:getBackgrounds');
+
+    // 3. Socket listeners for real-time synchronization with ALL users
+    const onBackgroundsUpdated = ({
+      backgrounds,
+    }: {
+      backgrounds: Array<{ id: string; name: string; url: string; uploadedBy: string; uploadedById: string; uploadedAt: number }>;
+    }) => {
+      if (Array.isArray(backgrounds)) {
+        setPublicBackgrounds(backgrounds);
+      }
+    };
+
+    const onGlobalBgAdded = ({
+      background,
+    }: {
+      background: { id: string; name: string; url: string; uploadedBy: string; uploadedById: string; createdAt: number };
+    }) => {
+      if (background) {
+        setPublicBackgrounds((prev) => {
+          if (prev.some((b) => b.id === background.id)) return prev;
+          return [
+            {
+              id: background.id,
+              name: background.name,
+              url: background.url,
+              uploadedBy: background.uploadedBy,
+              uploadedById: background.uploadedById || '',
+              uploadedAt: background.createdAt,
+            },
+            ...prev,
+          ];
+        });
+      }
+    };
+
+    const onGlobalBgRemoved = ({ bgId }: { bgId: string }) => {
+      setPublicBackgrounds((prev) => prev.filter((b) => b.id !== bgId));
+    };
+
+    socket.on('capture:backgroundsUpdated', onBackgroundsUpdated);
+    socket.on('capture:globalBackgroundAdded', onGlobalBgAdded);
+    socket.on('capture:globalBackgroundRemoved', onGlobalBgRemoved);
+
+    return () => {
+      socket.off('capture:backgroundsUpdated', onBackgroundsUpdated);
+      socket.off('capture:globalBackgroundAdded', onGlobalBgAdded);
+      socket.off('capture:globalBackgroundRemoved', onGlobalBgRemoved);
+    };
+  }, [socket]);
+
+  const handleSelectFilter = (newFilter: FilterType) => {
+    setFilter(newFilter);
+    filterRef.current = newFilter;
+    bgControllerRef.current?.updateFilter(newFilter);
+    socket.emit('capture:setFilter', { roomId: room.id, filter: newFilter });
+  };
+
+  const handleSelectBackground = (bg: VirtualBackground) => {
+    setSelectedBg(bg);
+    bgRef.current = bg;
+    bgControllerRef.current?.updateBackground(bg);
+  };
+
+  const handleCustomBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Ukuran gambar maksimal 15MB.');
+      return;
+    }
+
+    const myParticipant = participants.find((p) => p.id === myParticipantId);
+    const uploaderName = myParticipant?.displayName || 'Pengguna';
+    const bgTitle = file.name.replace(/\.[^/.]+$/, '');
+
+    setIsUploadingBg(true);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        // Instant camera preview locally
+        const previewBg: VirtualBackground = {
+          id: `local_preview_${Date.now()}`,
+          name: bgTitle,
+          category: 'custom',
+          type: 'image',
+          subtitle: `Diunggah oleh Kamu (Publik)`,
+          imageUrl: dataUrl,
+          previewUrl: dataUrl,
+        };
+        setSelectedBg(previewBg);
+        bgRef.current = previewBg;
+        bgControllerRef.current?.updateBackground(previewBg);
+
+        // Upload to server REST API and broadcast to ALL users globally
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('name', bgTitle);
+          formData.append('uploadedBy', uploaderName);
+          formData.append('participantId', myParticipantId);
+
+          const res = await fetch(`${getServerUrl()}/api/backgrounds/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (res.ok) {
+            const result = await res.json();
+            if (result.background) {
+              const uploadedBg: VirtualBackground = {
+                id: result.background.id,
+                name: result.background.name,
+                category: 'custom',
+                type: 'image',
+                subtitle: `Diunggah oleh Kamu (Publik)`,
+                imageUrl: result.background.url,
+                previewUrl: result.background.url,
+              };
+              setSelectedBg(uploadedBg);
+              bgRef.current = uploadedBg;
+              bgControllerRef.current?.updateBackground(uploadedBg);
+            }
+          } else {
+            // Fallback to socket upload
+            socket.emit('capture:uploadBackground', {
+              photoDataUrl: dataUrl,
+              name: bgTitle,
+              displayName: uploaderName,
+            });
+          }
+        } catch (err) {
+          console.error('Error uploading background via REST, falling back to socket:', err);
+          socket.emit('capture:uploadBackground', {
+            photoDataUrl: dataUrl,
+            name: bgTitle,
+            displayName: uploaderName,
+          });
+        } finally {
+          setIsUploadingBg(false);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveCustomBg = () => {
+    const noneBg = BACKGROUND_PRESETS[0];
+    setSelectedBg(noneBg);
+    bgRef.current = noneBg;
+    bgControllerRef.current?.updateBackground(noneBg);
+  };
+
+  const handleRemoveSharedBg = async (bgId: string) => {
+    if (!confirm('Hapus background publik ini dari daftar semua orang?')) return;
+
+    try {
+      await fetch(`${getServerUrl()}/api/backgrounds/${bgId}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.error('Error deleting background via REST:', err);
+    }
+    // Also emit socket event to broadcast removal
+    socket.emit('capture:removeBackground', { bgId });
+
+    if (selectedBg.id === bgId) {
+      handleSelectBackground(BACKGROUND_PRESETS[0]);
+    }
+  };
+
+  useEffect(() => {
+    bgControllerRef.current?.updateMirror(isMirrored);
+  }, [isMirrored]);
+
+  useEffect(() => {
+    bgControllerRef.current?.updateFilter(filter);
+  }, [filter]);
+
+  useEffect(() => {
+    bgControllerRef.current?.updateBackground(selectedBg);
+  }, [selectedBg]);
+
+  // Virtual Background Controller Lifecycle
+  useEffect(() => {
+    const video = localVideoRef.current;
+    const canvas = virtualCanvasRef.current;
+    if (!video || !canvas) return;
+
+    const controller = new BackgroundRenderController();
+    bgControllerRef.current = controller;
+    controller.updateCameraState(camOn);
+    controller.start(video, canvas, bgRef.current, filterRef.current, mirrorRef.current);
+
+    return () => {
+      controller.stop();
+      if (bgControllerRef.current === controller) {
+        bgControllerRef.current = null;
+      }
+    };
+  }, [camOn, facingMode]);
+
+  useEffect(() => {
+    const onFilterUpdated = ({ filter: syncedFilter }: { filter: FilterType }) => {
+      if (syncedFilter) {
+        setFilter(syncedFilter);
+        filterRef.current = syncedFilter;
+      }
+    };
+    socket.on('capture:filterUpdated', onFilterUpdated);
+    return () => {
+      socket.off('capture:filterUpdated', onFilterUpdated);
+    };
+  }, [socket]);
+
   useEffect(() => {
     const unsubMic = subscribeMicState(setMicOn);
     const unsubCam = subscribeCameraState((c, f) => {
       setCamOn(c);
       setFacingMode(f);
+      bgControllerRef.current?.updateCameraState(c);
+      if (localVideoRef.current) {
+        const stream = getActiveLocalStream();
+        if (c && stream) {
+          localVideoRef.current.srcObject = stream;
+          localVideoRef.current.play().catch(() => {});
+        } else if (!c) {
+          localVideoRef.current.srcObject = null;
+        }
+      }
     });
     return () => {
       unsubMic();
@@ -201,6 +479,16 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     if (isCaptureLocked) return;
     const next = await toggleCamera();
     setCamOn(next);
+    bgControllerRef.current?.updateCameraState(next);
+    if (localVideoRef.current) {
+      const stream = getActiveLocalStream();
+      if (next && stream) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(() => {});
+      } else if (!next) {
+        localVideoRef.current.srcObject = null;
+      }
+    }
   };
 
   const handleFlipCam = async () => {
@@ -412,7 +700,17 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     try {
       const activeFilter = filterRef.current;
       const activeMirror = mirrorRef.current;
-      const dataUrl = await captureFrame(localVideoRef.current, activeFilter, undefined, undefined, activeMirror);
+      let dataUrl = '';
+
+      // If virtual background is active, capture from background controller
+      if (bgRef.current.type !== 'none' && bgControllerRef.current) {
+        dataUrl = bgControllerRef.current.captureFrame();
+      }
+
+      if (!dataUrl) {
+        dataUrl = await captureFrame(localVideoRef.current, activeFilter, undefined, undefined, activeMirror);
+      }
+
       socket.emit('capture:frameUpload', {
         roomId: room.id,
         slotIndex: currentSlotIndex,
@@ -529,14 +827,34 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
               height: '100%',
               objectFit: 'cover',
               filter: FILTER_CSS[filter],
-              display: showPreview ? 'none' : 'block',
+              display: (showPreview || selectedBg.type !== 'none') ? 'none' : 'block',
               transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
               backfaceVisibility: 'hidden',
+            }}
+          />
+          <canvas
+            ref={virtualCanvasRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: (!showPreview && selectedBg.type !== 'none') ? 'block' : 'none',
             }}
           />
           {showPreview && previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="Preview Foto Solo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
+
+          {/* Camera Off Feedback Overlay */}
+          {!camOn && !showPreview && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '8px', zIndex: 12 }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CameraOffIcon size={26} color="var(--text-muted)" />
+              </div>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)' }}>Kamera Dinonaktifkan</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sensor & lampu indikator kamera telah mati</span>
+            </div>
           )}
 
           {/* Label tag */}
@@ -592,14 +910,29 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                         height: '100%',
                         objectFit: 'cover',
                         filter: FILTER_CSS[filter],
-                        display: showPreview ? 'none' : 'block',
+                        display: (showPreview || selectedBg.type !== 'none' || !camOn) ? 'none' : 'block',
                         transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
                         backfaceVisibility: 'hidden',
+                      }}
+                    />
+                    <canvas
+                      ref={virtualCanvasRef}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
                       }}
                     />
                     {showPreview && pPhoto && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={pPhoto} alt={p.displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )}
+                    {!camOn && !showPreview && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '6px', zIndex: 12 }}>
+                        <CameraOffIcon size={22} color="var(--text-muted)" />
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Kamera Mati</span>
+                      </div>
                     )}
                   </>
                 ) : (
@@ -644,11 +977,26 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)', backfaceVisibility: 'hidden' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: (showPreview || selectedBg.type !== 'none' || !camOn) ? 'none' : 'block', transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)', backfaceVisibility: 'hidden' }}
+                />
+                <canvas
+                  ref={virtualCanvasRef}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
+                  }}
                 />
                 {showPreview && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={currentSlot?.leftPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                )}
+                {!camOn && !showPreview && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '8px', zIndex: 12 }}>
+                    <CameraOffIcon size={26} color="var(--text-muted)" />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Kamera Dimatikan</span>
+                  </div>
                 )}
               </>
             ) : (
@@ -699,11 +1047,26 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: showPreview ? 'none' : 'block', transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)', backfaceVisibility: 'hidden' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', filter: FILTER_CSS[filter], display: (showPreview || selectedBg.type !== 'none' || !camOn) ? 'none' : 'block', transform: isMirrored ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)', backfaceVisibility: 'hidden' }}
+                />
+                <canvas
+                  ref={virtualCanvasRef}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
+                  }}
                 />
                 {showPreview && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={currentSlot?.rightPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                )}
+                {!camOn && !showPreview && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '8px', zIndex: 12 }}>
+                    <CameraOffIcon size={26} color="var(--text-muted)" />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Kamera Dimatikan</span>
+                  </div>
                 )}
               </>
             ) : (
@@ -832,8 +1195,43 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       {/* Controls Card */}
       <div className="glass-card" style={{ width: '100%', maxWidth: '680px', margin: '0 auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         
-        {/* Filter Bar (waiting state only, disabled/hidden during countdown) */}
+        {/* Tools Switcher (Filter vs Virtual Background) */}
         {roundStatus === 'waiting_ready' && !isCaptureLocked && (
+          <div className="camera-tools-tabs" role="tablist" aria-label="Alat Kamera">
+            <button
+              type="button"
+              className={`camera-tool-tab ${activeToolTab === 'filter' ? 'active' : ''}`}
+              onClick={() => setActiveToolTab('filter')}
+              role="tab"
+              aria-selected={activeToolTab === 'filter'}
+              id="tool-tab-filter"
+            >
+              <SlidersIcon size={14} />
+              <span>Filter Kamera</span>
+              <span className="badge badge-neutral" style={{ fontSize: '10px' }}>
+                {FILTERS.find((f) => f.id === filter)?.label || 'Original'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`camera-tool-tab ${activeToolTab === 'background' ? 'active' : ''}`}
+              onClick={() => setActiveToolTab('background')}
+              role="tab"
+              aria-selected={activeToolTab === 'background'}
+              id="tool-tab-bg"
+            >
+              <ImageIcon size={14} />
+              <span>Ganti Background</span>
+              <span className={`badge ${selectedBg.type !== 'none' ? 'badge-pink' : 'badge-neutral'}`} style={{ fontSize: '10px' }}>
+                {selectedBg.name}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* ── 1. FILTER PANEL ────────────────────────────────────────────── */}
+        {roundStatus === 'waiting_ready' && !isCaptureLocked && activeToolTab === 'filter' && (
           <div className="filter-bar-container">
             {/* Filter Header & Active Indicator */}
             <div className="filter-header-row">
@@ -877,7 +1275,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     key={f.id}
                     type="button"
                     className={`filter-item-btn ${active ? 'active' : ''}`}
-                    onClick={() => setFilter(f.id)}
+                    onClick={() => handleSelectFilter(f.id)}
                     id={`filter-${f.id}-btn`}
                     title={`${f.label} (${f.subtitle})`}
                     role="option"
@@ -890,6 +1288,212 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                       }}
                     />
                     <span style={{ whiteSpace: 'nowrap', lineHeight: 1.2 }}>{f.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── 2. VIRTUAL BACKGROUND PANEL ────────────────────────────────── */}
+        {roundStatus === 'waiting_ready' && !isCaptureLocked && activeToolTab === 'background' && (
+          <div className="filter-bar-container">
+            {/* Background Header & Active Indicator */}
+            <div className="filter-header-row">
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <ImageIcon size={14} color="var(--primary)" />
+                Pilihan Virtual Background
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="badge badge-neutral" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                  Aktif: <strong style={{ color: 'var(--primary)', marginLeft: '3px' }}>{selectedBg.name}</strong>
+                </span>
+                {selectedBg.type !== 'none' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectBackground(BACKGROUND_PRESETS[0])}
+                    className="btn btn-sm btn-ghost"
+                    style={{ fontSize: '10.5px', padding: '2px 8px', color: '#f87171', height: 'auto', minHeight: 'unset' }}
+                    title="Kembali ke kamera asli tanpa background"
+                  >
+                    ↺ Matikan BG
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Notice / Information Banner about Public Community Background */}
+            <div className="shared-bg-notice-box">
+              <span style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>🌍</span>
+              <div className="shared-bg-notice-text">
+                <strong style={{ color: '#f472b6' }}>Background Publik & Komunitas:</strong> Background yang kamu upload bersifat <strong>publik dan dapat digunakan oleh SEMUA ORANG</strong> di seluruh ruangan photobooth. Background tersimpan permanen di galeri publik (tidak terhapus seperti hasil foto capture).
+              </div>
+            </div>
+
+            {/* Background Category Tabs */}
+            <div className="filter-category-tabs" role="tablist" aria-label="Kategori Background">
+              {BG_CATEGORIES.map((cat) => {
+                const count = cat.id === 'all'
+                  ? BACKGROUND_PRESETS.length + publicBackgrounds.length
+                  : cat.id === 'custom'
+                  ? publicBackgrounds.length
+                  : BACKGROUND_PRESETS.filter((b) => b.category === cat.id).length;
+                const active = selectedBgCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`filter-category-btn ${active ? 'active' : ''}`}
+                    onClick={() => setSelectedBgCategory(cat.id)}
+                    role="tab"
+                    aria-selected={active}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    <span style={{ opacity: 0.65, fontSize: '10px' }}>({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Hidden Custom File Upload Input */}
+            <input
+              type="file"
+              ref={customFileInputRef}
+              accept="image/png, image/jpeg, image/webp"
+              onChange={handleCustomBgUpload}
+              style={{ display: 'none' }}
+              id="hidden-custom-bg-input"
+            />
+
+            {/* Horizontal Background Strip */}
+            <div className="filter-scroll-strip" role="listbox" aria-label="Pilihan Background">
+              {/* Custom Upload Card (shown on 'all' or 'custom' tabs) */}
+              {(selectedBgCategory === 'all' || selectedBgCategory === 'custom') && (
+                <div
+                  className="bg-upload-card"
+                  title="Upload background sendiri untuk dibagikan ke semua orang di seluruh photobooth"
+                >
+                  <button
+                    type="button"
+                    className="bg-upload-btn-trigger"
+                    onClick={() => customFileInputRef.current?.click()}
+                    disabled={isUploadingBg}
+                    title="Upload gambar publik dari perangkat Anda"
+                  >
+                    <div className="bg-upload-icon-box">
+                      {isUploadingBg ? (
+                        <span className="spinner" style={{ width: '16px', height: '16px' }} />
+                      ) : (
+                        <UploadIcon size={18} color="var(--primary)" />
+                      )}
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {isUploadingBg ? 'Mengunggah…' : '+ Upload'}
+                    </span>
+                    <span style={{ fontSize: '9px', color: 'var(--accent-pink)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      🌍 Publik
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {/* Public Community Custom Backgrounds */}
+              {(selectedBgCategory === 'all' || selectedBgCategory === 'custom') &&
+                publicBackgrounds.map((sb) => {
+                  const active = selectedBg.id === sb.id;
+                  const isUploadedByMe = sb.uploadedById === myParticipantId;
+                  return (
+                    <div
+                      key={sb.id}
+                      className={`filter-item-btn shared-bg-item ${active ? 'active' : ''}`}
+                      onClick={() => {
+                        handleSelectBackground({
+                          id: sb.id,
+                          name: sb.name,
+                          category: 'custom',
+                          type: 'image',
+                          subtitle: `Publik: Oleh ${isUploadedByMe ? 'Kamu' : sb.uploadedBy}`,
+                          imageUrl: sb.url,
+                          previewUrl: sb.url,
+                        });
+                      }}
+                      role="option"
+                      aria-selected={active}
+                      title={`${sb.name} (Dibagikan ke publik oleh ${sb.uploadedBy})`}
+                      style={{ position: 'relative' }}
+                    >
+                      <div
+                        className="filter-swatch"
+                        style={{
+                          backgroundImage: `url(${sb.url})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        }}
+                      />
+                      <span style={{ whiteSpace: 'nowrap', lineHeight: 1.2, maxWidth: '75px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {sb.name}
+                      </span>
+                      <span className="badge badge-pink" style={{ fontSize: '8.5px', padding: '1px 4px', lineHeight: 1.1 }}>
+                        🌍 {isUploadedByMe ? 'Kamu' : sb.uploadedBy}
+                      </span>
+                      {isUploadedByMe && (
+                        <button
+                          type="button"
+                          className="shared-bg-del-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSharedBg(sb.id);
+                          }}
+                          title="Hapus background publik ini"
+                        >
+                          <TrashIcon size={10} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {/* Preset Background Cards */}
+              {BACKGROUND_PRESETS.filter((b) => selectedBgCategory === 'all' || b.category === selectedBgCategory).map((b) => {
+                const active = selectedBg.id === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={`filter-item-btn ${active ? 'active' : ''}`}
+                    onClick={() => handleSelectBackground(b)}
+                    id={`bg-${b.id}-btn`}
+                    title={`${b.name} (${b.subtitle})`}
+                    role="option"
+                    aria-selected={active}
+                  >
+                    {/* Swatch rendering based on type */}
+                    <div
+                      className="filter-swatch"
+                      style={{
+                        background:
+                          b.type === 'color'
+                            ? b.color
+                            : b.type === 'image' && b.previewUrl
+                            ? `url(${b.previewUrl}) center/cover no-repeat`
+                            : b.type === 'blur'
+                            ? 'radial-gradient(circle, rgba(99,102,241,0.5) 0%, rgba(30,41,59,0.9) 100%)'
+                            : 'linear-gradient(135deg, #1e293b, #0f172a)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {b.type === 'none' && <CameraIcon size={16} color="var(--text-muted)" />}
+                      {b.type === 'blur' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                          <DropletIcon size={14} color="#60a5fa" />
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#e0f2fe' }}>{b.blurPx}px</span>
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ whiteSpace: 'nowrap', lineHeight: 1.2 }}>{b.name}</span>
                   </button>
                 );
               })}

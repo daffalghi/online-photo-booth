@@ -14,6 +14,7 @@ import { initDb } from './db';
 import { setupSocketIO } from './socket';
 import roomsRouter from './routes/rooms';
 import framesRouter from './routes/frames';
+import backgroundsRouter from './routes/backgrounds';
 import { cleanupExpiredRooms } from './services/roomService';
 import { UPLOADS_DIR, RENDERS_DIR } from './services/compositeService';
 
@@ -85,6 +86,7 @@ app.use('/api/rooms', (req, res, next) => {
 }, roomsRouter);
 
 app.use('/api/frames', framesRouter);
+app.use('/api/backgrounds', backgroundsRouter);
 app.get('/health', (req, res) => {
   const isEncrypted = 'encrypted' in req.socket && Boolean((req.socket as import('tls').TLSSocket).encrypted);
   res.json({ status: 'ok', protocol: isEncrypted ? 'https' : 'http', ts: Date.now() });

@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import * as roomService from '../../services/roomService';
 import path from 'path';
 import fs from 'fs';
+import knex from '../../db';
 import { UPLOADS_DIR } from '../../services/compositeService';
 import { broadcastRoomState } from './room';
 import { AppSocket } from '../../types';
@@ -26,6 +27,35 @@ const countdownMap = new Map<string, Map<number, ReturnType<typeof setTimeout>>>
 
 /** Participants who said "Done taking photos" */
 const finishMap = new Map<string, Set<string>>();
+
+export interface SharedBackgroundItem {
+  id: string;
+  name: string;
+  url: string;
+  uploadedBy: string;
+  uploadedById: string;
+  uploadedAt: number;
+}
+
+/** Retrieve all public custom backgrounds from SQLite to be shared with all users */
+export async function getGlobalBackgrounds(baseUrl: string): Promise<SharedBackgroundItem[]> {
+  try {
+    const rows = await knex('custom_backgrounds')
+      .orderBy('created_at', 'desc')
+      .limit(100);
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      url: `${baseUrl}/uploads/${r.storage_key}`,
+      uploadedBy: r.uploaded_by,
+      uploadedById: r.uploaded_by_id || '',
+      uploadedAt: r.created_at,
+    }));
+  } catch (err) {
+    console.error('Error fetching global custom backgrounds:', err);
+    return [];
+  }
+}
 
 function getReadySet(roomId: string, slotIndex: number): Set<string> {
   if (!readyMap.has(roomId)) readyMap.set(roomId, new Map());
@@ -104,6 +134,13 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
 
     if (!countdownMap.has(roomId)) countdownMap.set(roomId, new Map());
     countdownMap.get(roomId)!.set(slotIndex, handle);
+  });
+
+  // ── Filter changed by any participant ────────────────────────────────────
+  socket.on('capture:setFilter', (payload: { roomId: string; filter: string }) => {
+    const { roomId, filter } = payload;
+    if (!roomId) return;
+    io.to(roomId).emit('capture:filterUpdated', { filter });
   });
 
   // ── Frame uploaded from client ───────────────────────────────────────────
@@ -267,4 +304,87 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
       await broadcastRoomState(io, roomId, baseUrl);
     }
   });
+
+  // ── Global Custom Backgrounds: get public backgrounds for everyone ───────
+  socket.on('capture:getBackgrounds', async () => {
+    try {
+      const backgrounds = await getGlobalBackgrounds(baseUrl);
+      socket.emit('capture:backgroundsUpdated', { backgrounds });
+    } catch (err) {
+      console.error('Error on capture:getBackgrounds:', err);
+    }
+  });
+
+  // ── Global Custom Backgrounds: upload and share with everyone globally ────
+  socket.on(
+    'capture:uploadBackground',
+    async (payload: { photoDataUrl: string; name?: string; displayName?: string }) => {
+      try {
+        const { photoDataUrl, name, displayName } = payload;
+        if (!photoDataUrl) return;
+
+        const participantId = socket.participantId || null;
+        let uploaderName = displayName;
+        if (!uploaderName && participantId) {
+          const participant = await knex('participants').where('id', participantId).first();
+          uploaderName = participant?.display_name;
+        }
+        uploaderName = uploaderName || 'Pengguna';
+        const bgName = name?.trim() || 'Custom Background';
+
+        const matches = photoDataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) return;
+
+        const mime = matches[1];
+        const ext = mime.includes('png') ? '.png' : mime.includes('webp') ? '.webp' : '.jpg';
+        const buffer = Buffer.from(matches[2], 'base64');
+        const storageKey = `bg_global_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+        const filePath = path.join(UPLOADS_DIR, storageKey);
+
+        await fs.promises.writeFile(filePath, buffer);
+
+        const bgId = `bg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const now = Date.now();
+
+        await knex('custom_backgrounds').insert({
+          id: bgId,
+          name: bgName,
+          storage_key: storageKey,
+          uploaded_by: uploaderName,
+          uploaded_by_id: participantId,
+          created_at: now,
+        });
+
+        // Broadcast to ALL users across ALL rooms globally
+        const backgrounds = await getGlobalBackgrounds(baseUrl);
+        io.emit('capture:backgroundsUpdated', { backgrounds });
+      } catch (err) {
+        console.error('Error on capture:uploadBackground:', err);
+      }
+    },
+  );
+
+  // ── Global Custom Backgrounds: remove ────────────────────────────────────
+  socket.on('capture:removeBackground', async (payload: { bgId: string }) => {
+    try {
+      const { bgId } = payload;
+      if (!bgId) return;
+
+      const row = await knex('custom_backgrounds').where('id', bgId).first();
+      if (row) {
+        const filePath = path.join(UPLOADS_DIR, row.storage_key);
+        if (fs.existsSync(filePath)) {
+          await fs.promises.unlink(filePath).catch(() => {});
+        }
+        await knex('custom_backgrounds').where('id', bgId).del();
+      }
+
+      // Broadcast to ALL users across ALL rooms globally
+      const backgrounds = await getGlobalBackgrounds(baseUrl);
+      io.emit('capture:backgroundsUpdated', { backgrounds });
+    } catch (err) {
+      console.error('Error on capture:removeBackground:', err);
+    }
+  });
 }
+

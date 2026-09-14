@@ -15,7 +15,7 @@ import FrameSelection from './FrameSelection';
 import ResultPage from './ResultPage';
 import StepHeader from './StepHeader';
 import RoomChat from './RoomChat';
-import { CameraIcon, UserIcon, InfoIcon, HomeIcon, LockIcon } from './Icons';
+import { CameraIcon, UserIcon, InfoIcon, HomeIcon, LockIcon, SearchIcon, SparklesIcon, ArrowRightIcon } from './Icons';
 import { resolveMediaUrl, getServerUrl } from '@/lib/config';
 import { useLanguage } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -47,6 +47,8 @@ export default function RoomPage({ code }: RoomPageProps) {
   const [lockedCustomization, setLockedCustomization] = useState<{ accentColor?: string; captionText?: string }>({});
   const [error, setError] = useState('');
   const [takingLong, setTakingLong] = useState(false);
+  const [retryCodeInput, setRetryCodeInput] = useState('');
+  const [showFlash, setShowFlash] = useState(false);
   const joinedRef = useRef(false);
 
   // Smart media lifecycle: turn off physical camera sensor/LED during frame & photo selection,
@@ -420,18 +422,223 @@ export default function RoomPage({ code }: RoomPageProps) {
   }
 
   if (phase === 'error' || !room) {
+    const triggerFlash = () => {
+      setShowFlash(true);
+      setTimeout(() => setShowFlash(false), 450);
+    };
+
+    const handleRetrySubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const clean = retryCodeInput.trim().toUpperCase();
+      if (clean.length >= 4) {
+        window.location.href = `/room/${clean}`;
+      }
+    };
+
     return (
-      <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '24px' }}>
-        <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}>
-          <InfoIcon size={24} />
+      <main className="not-found-wrapper">
+        {showFlash && <div className="flash-effect-overlay" />}
+
+        {/* Ambient Glow Orbs */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '15%',
+            left: '20%',
+            width: '280px',
+            height: '280px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(244,63,94,0.15) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '15%',
+            right: '20%',
+            width: '320px',
+            height: '320px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+            filter: 'blur(50px)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        <div className="not-found-card">
+          {/* Interactive Polaroid Artwork */}
+          <div className="not-found-art-scene" onClick={triggerFlash} title="Klik polaroid untuk jepret kamera! 📸">
+            <div className="polaroid-frame polaroid-bg-tilt">
+              <div
+                style={{
+                  flex: 1,
+                  background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <SparklesIcon size={24} color="#f43f5e" />
+              </div>
+            </div>
+
+            <div className="polaroid-frame polaroid-main float-gentle">
+              <div className="polaroid-tape" />
+              <div className="polaroid-photo-area">
+                <CameraIcon size={28} color="#f43f5e" />
+                <span
+                  style={{
+                    fontSize: '9px',
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 800,
+                    color: 'var(--accent-pink)',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  ROOM HILANG
+                </span>
+                <span style={{ fontSize: '7.5px', color: 'var(--text-muted)' }}>Klik Aku! ⚡</span>
+              </div>
+              <div
+                style={{
+                  marginTop: '6px',
+                  fontSize: '9.5px',
+                  fontWeight: 700,
+                  color: '#334155',
+                  letterSpacing: '1px',
+                  textAlign: 'center',
+                }}
+              >
+                KODE: {code}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <span
+              className="badge badge-pink"
+              style={{
+                padding: '4px 12px',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+              }}
+            >
+              🔒 Sesi Tidak Ditemukan
+            </span>
+          </div>
+
+          <h2
+            style={{
+              fontSize: 'clamp(20px, 4.5vw, 24px)',
+              fontWeight: 800,
+              lineHeight: 1.25,
+              marginBottom: '10px',
+              fontFamily: 'var(--font-display)',
+              letterSpacing: '-0.5px',
+            }}
+          >
+            Room &ldquo;{code}&rdquo; Tidak Ditemukan
+          </h2>
+
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '13.5px',
+              lineHeight: 1.6,
+              marginBottom: '6px',
+              maxWidth: '380px',
+            }}
+          >
+            {error || `Room "${code}" tidak ditemukan atau masa berlakunya telah berakhir (maksimal 2 jam demi privasi).`}
+          </p>
+
+          {/* Quick Room Code Re-try Form */}
+          <div className="not-found-quick-join">
+            <label
+              htmlFor="retry-room-code"
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <SearchIcon size={12} color="var(--accent-pink)" />
+              Coba Masukkan Ulang Kode Room:
+            </label>
+            <form onSubmit={handleRetrySubmit} className="quick-join-input-group">
+              <input
+                id="retry-room-code"
+                type="text"
+                maxLength={6}
+                value={retryCodeInput}
+                onChange={(e) => setRetryCodeInput(e.target.value.toUpperCase())}
+                placeholder="Contoh: AB12CD"
+                className="quick-join-input"
+              />
+              <button
+                type="submit"
+                disabled={retryCodeInput.trim().length < 4}
+                className="btn btn-primary btn-sm"
+                style={{ padding: '0 16px', borderRadius: 'var(--radius-md)', whiteSpace: 'nowrap' }}
+              >
+                Masuk <ArrowRightIcon size={13} />
+              </button>
+            </form>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              width: '100%',
+              flexWrap: 'wrap',
+            }}
+          >
+            <a
+              href="/"
+              className="btn btn-primary"
+              id="home-btn"
+              style={{
+                flex: '1 1 180px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontWeight: 700,
+              }}
+            >
+              <HomeIcon size={16} /> Kembali ke Beranda
+            </a>
+
+            <button
+              type="button"
+              onClick={triggerFlash}
+              className="btn btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <CameraIcon size={15} /> Flash Kamera ⚡
+            </button>
+          </div>
+
+          <div style={{ marginTop: '22px', fontSize: '11px', color: 'var(--text-muted)' }}>
+            Online Photo Booth • Abadikan Momen Bersama
+          </div>
         </div>
-        <h2 style={{ fontSize: '20px', fontWeight: 800 }}>Room Tidak Ditemukan</h2>
-        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', fontSize: '13px', maxWidth: '320px' }}>
-          {error || `Room "${code}" tidak ditemukan atau masa berlakunya telah berakhir.`}
-        </p>
-        <a href="/" className="btn btn-secondary btn-sm" id="home-btn">
-          <HomeIcon size={14} /> Kembali ke Beranda
-        </a>
       </main>
     );
   }

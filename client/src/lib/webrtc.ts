@@ -61,6 +61,10 @@ export function setRemoteStreamCallback(cb: (stream: MediaStream) => void): void
 const activeLocalTracks = new Set<MediaStreamTrack>();
 let localStreamPromise: Promise<MediaStream> | null = null;
 
+export function getActiveLocalStream(): MediaStream | null {
+  return localStream;
+}
+
 export async function getLocalStream(): Promise<MediaStream> {
   if (localStream && localStream.active && localStream.getVideoTracks().some((t) => t.readyState === 'live')) {
     return localStream;
@@ -225,31 +229,82 @@ export async function toggleMic(): Promise<boolean> {
 }
 
 /**
- * Toggles camera video transmission on/off without dropping the peer connection or audio stream.
+ * Toggles camera video transmission on/off.
+ * When disabled, physically stops the camera hardware sensor so the webcam LED indicator turns off completely.
+ * When enabled, re-acquires camera video from the browser and rebinds tracks without dropping WebRTC or audio.
  */
 export async function setCameraEnabled(enabled: boolean): Promise<boolean> {
   cameraState = enabled;
 
-  if (localStream) {
-    localStream.getVideoTracks().forEach((track) => {
-      track.enabled = enabled;
-    });
-  }
-
-  const targetVideoTrack = enabled && localStream ? (localStream.getVideoTracks()[0] || null) : null;
-
-  for (const pc of peerConnections.values()) {
-    const senders = pc.getSenders();
-    for (const sender of senders) {
-      if (sender.track?.kind === 'video' || (!sender.track && enabled)) {
+  if (!enabled) {
+    // ── 1. PHYSICALLY STOP CAMERA SENSOR SO LED INDICATOR TURNS OFF ──
+    if (localStream) {
+      const videoTracks = localStream.getVideoTracks();
+      videoTracks.forEach((track) => {
         try {
-          await sender.replaceTrack(targetVideoTrack);
-        } catch (_) {
-          if (sender.track) {
-            sender.track.enabled = enabled;
+          track.stop(); // Releases hardware sensor & turns off webcam LED
+          localStream?.removeTrack(track);
+          activeLocalTracks.delete(track);
+        } catch (_) {}
+      });
+    }
+
+    // Replace video track in peer connections with null
+    for (const pc of peerConnections.values()) {
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (sender.track?.kind === 'video') {
+          try {
+            await sender.replaceTrack(null);
+          } catch (_) {}
+        }
+      }
+    }
+  } else {
+    // ── 2. RE-ACQUIRE CAMERA SENSOR FROM BROWSER ──
+    try {
+      if (navigator?.mediaDevices?.getUserMedia) {
+        const freshStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: currentFacingMode,
+            width: { ideal: 1920, min: 640 },
+            height: { ideal: 1080, min: 480 },
+            frameRate: { ideal: 60, min: 24 },
+          },
+          audio: false,
+        });
+
+        const newVideoTrack = freshStream.getVideoTracks()[0];
+        if (newVideoTrack) {
+          if (!localStream) {
+            localStream = new MediaStream();
+          }
+          // Remove any dead/ended video tracks
+          localStream.getVideoTracks().forEach((t) => {
+            localStream?.removeTrack(t);
+            activeLocalTracks.delete(t);
+          });
+
+          localStream.addTrack(newVideoTrack);
+          activeLocalTracks.add(newVideoTrack);
+          newVideoTrack.addEventListener('ended', () => activeLocalTracks.delete(newVideoTrack));
+
+          // Re-attach live video track to all peer connections
+          for (const pc of peerConnections.values()) {
+            const senders = pc.getSenders();
+            for (const sender of senders) {
+              if (sender.track?.kind === 'video' || !sender.track) {
+                try {
+                  await sender.replaceTrack(newVideoTrack);
+                } catch (_) {}
+              }
+            }
           }
         }
       }
+    } catch (err) {
+      console.warn('[WebRTC] Failed to re-acquire camera sensor:', err);
+      cameraState = false;
     }
   }
 
@@ -318,6 +373,7 @@ export function stopVideoOnly(): void {
       try {
         track.stop();
         track.enabled = false;
+        localStream?.removeTrack(track);
         activeLocalTracks.delete(track);
       } catch (_) {}
     });
