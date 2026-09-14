@@ -438,6 +438,14 @@ export async function compositePhotos(
         overlayFilePath = cand;
         break;
       }
+      // Alternate extension check (.webp <-> .png)
+      const parsed = path.parse(cand);
+      const altExt = parsed.ext === '.png' ? '.webp' : '.png';
+      const altCand = path.join(parsed.dir, parsed.name + altExt);
+      if (fs.existsSync(altCand)) {
+        overlayFilePath = altCand;
+        break;
+      }
     }
   }
 

@@ -4,7 +4,7 @@
     "name": "X3 Basic 1",
     "category": "1x3",
     "layout_type": "1x3",
-    "overlay_url": "/frames/1x3/1x3%20basic-1.png",
+    "overlay_url": "/frames/1x3/1x3%20basic-1.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 3-cut vertical photostrip",
@@ -29,14 +29,15 @@
         "width": 974,
         "height": 1024
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x3/1x3%20basic-1_thumb.webp"
   },
   {
     "id": "1x3_1x3_basic_2_png",
     "name": "X3 Basic 2",
     "category": "1x3",
     "layout_type": "1x3",
-    "overlay_url": "/frames/1x3/1x3%20basic-2.png",
+    "overlay_url": "/frames/1x3/1x3%20basic-2.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 3-cut vertical photostrip",
@@ -61,14 +62,15 @@
         "width": 789,
         "height": 620
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x3/1x3%20basic-2_thumb.webp"
   },
   {
     "id": "1x3_1x3_basic_3_png",
     "name": "X3 Basic 3",
     "category": "1x3",
     "layout_type": "1x3",
-    "overlay_url": "/frames/1x3/1x3%20basic-3.png",
+    "overlay_url": "/frames/1x3/1x3%20basic-3.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 3-cut vertical photostrip",
@@ -93,14 +95,15 @@
         "width": 926,
         "height": 932
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x3/1x3%20basic-3_thumb.webp"
   },
   {
     "id": "1x3_1x3_basic_4_png",
     "name": "X3 Basic 4",
     "category": "1x3",
     "layout_type": "1x3",
-    "overlay_url": "/frames/1x3/1x3%20basic-4.png",
+    "overlay_url": "/frames/1x3/1x3%20basic-4.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 3-cut vertical photostrip",
@@ -125,14 +128,15 @@
         "width": 499,
         "height": 478
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x3/1x3%20basic-4_thumb.webp"
   },
   {
     "id": "1x3_1x3_basic_5_png",
     "name": "X3 Basic 5",
     "category": "1x3",
     "layout_type": "1x3",
-    "overlay_url": "/frames/1x3/1x3%20basic-5.png",
+    "overlay_url": "/frames/1x3/1x3%20basic-5.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 3-cut vertical photostrip",
@@ -157,14 +161,15 @@
         "width": 796,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x3/1x3%20basic-5_thumb.webp"
   },
   {
     "id": "1x4_12_style_girl_png",
     "name": "Style Girl",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/12_Style_Girl.png",
+    "overlay_url": "/frames/1x4/12_Style_Girl.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -195,14 +200,15 @@
         "width": 1120,
         "height": 1094
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/12_Style_Girl_thumb.webp"
   },
   {
     "id": "1x4_1x4_blue_scrapbook_png",
     "name": "X4 Blue Scrapbook",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/1x4-blue-scrapbook.png",
+    "overlay_url": "/frames/1x4/1x4-blue-scrapbook.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -233,14 +239,15 @@
         "width": 515,
         "height": 369
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/1x4-blue-scrapbook_thumb.webp"
   },
   {
     "id": "1x4_1x4_green_birthday_png",
     "name": "X4 Green Birthday",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/1x4-green-birthday.png",
+    "overlay_url": "/frames/1x4/1x4-green-birthday.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -271,14 +278,15 @@
         "width": 495,
         "height": 327
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/1x4-green-birthday_thumb.webp"
   },
   {
     "id": "1x4_anhtraisayhi_png",
     "name": "Anhtraisayhi",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/AnhTraiSayHi.png",
+    "overlay_url": "/frames/1x4/AnhTraiSayHi.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -309,14 +317,15 @@
         "width": 786,
         "height": 618
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/AnhTraiSayHi_thumb.webp"
   },
   {
     "id": "1x4_basic_10_png",
     "name": "Basic 10",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Basic-10.png",
+    "overlay_url": "/frames/1x4/Basic-10.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -347,14 +356,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Basic-10_thumb.webp"
   },
   {
     "id": "1x4_basic_5_png",
     "name": "Basic 5",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Basic-5.png",
+    "overlay_url": "/frames/1x4/Basic-5.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -385,14 +395,15 @@
         "width": 784,
         "height": 615
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Basic-5_thumb.webp"
   },
   {
     "id": "1x4_basic_7_png",
     "name": "Basic 7",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Basic-7.png",
+    "overlay_url": "/frames/1x4/Basic-7.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -423,14 +434,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Basic-7_thumb.webp"
   },
   {
     "id": "1x4_basic12_png",
     "name": "Basic12",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Basic12.png",
+    "overlay_url": "/frames/1x4/Basic12.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -461,14 +473,15 @@
         "width": 1084,
         "height": 854
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Basic12_thumb.webp"
   },
   {
     "id": "1x4_bearbare_png",
     "name": "Bearbare",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/BearBare.png",
+    "overlay_url": "/frames/1x4/BearBare.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -499,14 +512,15 @@
         "width": 797,
         "height": 637
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/BearBare_thumb.webp"
   },
   {
     "id": "1x4_bts_png",
     "name": "Bts",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/BTS.png",
+    "overlay_url": "/frames/1x4/BTS.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -537,14 +551,15 @@
         "width": 538,
         "height": 570
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/BTS_thumb.webp"
   },
   {
     "id": "1x4_bunbohue_png",
     "name": "Bunbohue",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/BunBoHue.png",
+    "overlay_url": "/frames/1x4/BunBoHue.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -575,14 +590,15 @@
         "width": 780,
         "height": 612
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/BunBoHue_thumb.webp"
   },
   {
     "id": "1x4_cinnamoroll_png",
     "name": "Cinnamoroll",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Cinnamoroll.png",
+    "overlay_url": "/frames/1x4/Cinnamoroll.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -613,14 +629,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Cinnamoroll_thumb.webp"
   },
   {
     "id": "1x4_cream_soda_png",
     "name": "Cream Soda",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/cream-soda.png",
+    "overlay_url": "/frames/1x4/cream-soda.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -651,14 +668,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/cream-soda_thumb.webp"
   },
   {
     "id": "1x4_digitalcam_cartoon_png",
     "name": "Digitalcam Cartoon",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/digitalcam%20cartoon.png",
+    "overlay_url": "/frames/1x4/digitalcam%20cartoon.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -689,14 +707,15 @@
         "width": 585,
         "height": 488
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/digitalcam%20cartoon_thumb.webp"
   },
   {
     "id": "1x4_dpr_ian_png",
     "name": "Dpr Ian",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/DPR%20IAN.png",
+    "overlay_url": "/frames/1x4/DPR%20IAN.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -727,14 +746,15 @@
         "width": 796,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/DPR%20IAN_thumb.webp"
   },
   {
     "id": "1x4_d__ng_domic_png",
     "name": "Dương Domic",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/D%C6%B0%C6%A1ng%20Domic.png",
+    "overlay_url": "/frames/1x4/D%C6%B0%C6%A1ng%20Domic.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -765,14 +785,15 @@
         "width": 404,
         "height": 245
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/D%C6%B0%C6%A1ng%20Domic_thumb.webp"
   },
   {
     "id": "1x4_emxinhsayhi_png",
     "name": "Emxinhsayhi",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/EmXinhSayHi.png",
+    "overlay_url": "/frames/1x4/EmXinhSayHi.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -803,14 +824,15 @@
         "width": 780,
         "height": 612
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/EmXinhSayHi_thumb.webp"
   },
   {
     "id": "1x4_fannct_dream_png",
     "name": "Fannct Dream",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/FanNCT_DREAM.png",
+    "overlay_url": "/frames/1x4/FanNCT_DREAM.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -841,14 +863,15 @@
         "width": 1695,
         "height": 1320
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/FanNCT_DREAM_thumb.webp"
   },
   {
     "id": "1x4_g_dragon_png",
     "name": "G Dragon",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/G-Dragon.png",
+    "overlay_url": "/frames/1x4/G-Dragon.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -879,14 +902,15 @@
         "width": 666,
         "height": 593
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/G-Dragon_thumb.webp"
   },
   {
     "id": "1x4_girly_png",
     "name": "Girly",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Girly.png",
+    "overlay_url": "/frames/1x4/Girly.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -917,14 +941,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Girly_thumb.webp"
   },
   {
     "id": "1x4_gumball_png",
     "name": "Gumball",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Gumball.png",
+    "overlay_url": "/frames/1x4/Gumball.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -955,14 +980,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Gumball_thumb.webp"
   },
   {
     "id": "1x4_happy_moments_png",
     "name": "Happy Moments",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Happy%20Moments.png",
+    "overlay_url": "/frames/1x4/Happy%20Moments.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -993,14 +1019,15 @@
         "width": 558,
         "height": 460
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Happy%20Moments_thumb.webp"
   },
   {
     "id": "1x4_hellokitty_png",
     "name": "Hellokitty",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/HelloKitty.png",
+    "overlay_url": "/frames/1x4/HelloKitty.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1031,14 +1058,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/HelloKitty_thumb.webp"
   },
   {
     "id": "1x4_instagram_png",
     "name": "Instagram",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Instagram.png",
+    "overlay_url": "/frames/1x4/Instagram.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1069,14 +1097,15 @@
         "width": 795,
         "height": 626
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Instagram_thumb.webp"
   },
   {
     "id": "1x4_ios_png",
     "name": "Ios",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/IOS.png",
+    "overlay_url": "/frames/1x4/IOS.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1107,14 +1136,15 @@
         "width": 780,
         "height": 614
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/IOS_thumb.webp"
   },
   {
     "id": "1x4_jeans_png",
     "name": "Jeans",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Jeans.png",
+    "overlay_url": "/frames/1x4/Jeans.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1145,14 +1175,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Jeans_thumb.webp"
   },
   {
     "id": "1x4_juky_san_png",
     "name": "Juky San",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Juky%20San.png",
+    "overlay_url": "/frames/1x4/Juky%20San.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1183,14 +1214,15 @@
         "width": 787,
         "height": 592
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Juky%20San_thumb.webp"
   },
   {
     "id": "1x4_llya_rozanov_png",
     "name": "Llya Rozanov",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/LLYA%20Rozanov.png",
+    "overlay_url": "/frames/1x4/LLYA%20Rozanov.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1221,14 +1253,15 @@
         "width": 765,
         "height": 566
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/LLYA%20Rozanov_thumb.webp"
   },
   {
     "id": "1x4_locket_png",
     "name": "Locket",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Locket.png",
+    "overlay_url": "/frames/1x4/Locket.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1259,14 +1292,15 @@
         "width": 797,
         "height": 630
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Locket_thumb.webp"
   },
   {
     "id": "1x4_loopy_png",
     "name": "Loopy",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Loopy.png",
+    "overlay_url": "/frames/1x4/Loopy.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1297,14 +1331,15 @@
         "width": 797,
         "height": 637
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Loopy_thumb.webp"
   },
   {
     "id": "1x4_lucky_png",
     "name": "Lucky",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Lucky.png",
+    "overlay_url": "/frames/1x4/Lucky.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1335,14 +1370,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Lucky_thumb.webp"
   },
   {
     "id": "1x4_matcha_png",
     "name": "Matcha",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/matcha.png",
+    "overlay_url": "/frames/1x4/matcha.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1373,14 +1409,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/matcha_thumb.webp"
   },
   {
     "id": "1x4_meme_png",
     "name": "Meme",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Meme.png",
+    "overlay_url": "/frames/1x4/Meme.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1411,14 +1448,15 @@
         "width": 780,
         "height": 612
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Meme_thumb.webp"
   },
   {
     "id": "1x4_merry_chirstmas______png",
     "name": "Merry Chirstmas 🎅🏻",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Merry%20Chirstmas%20%F0%9F%8E%85%F0%9F%8F%BB.png",
+    "overlay_url": "/frames/1x4/Merry%20Chirstmas%20%F0%9F%8E%85%F0%9F%8F%BB.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1449,14 +1487,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Merry%20Chirstmas%20%F0%9F%8E%85%F0%9F%8F%BB_thumb.webp"
   },
   {
     "id": "1x4_minion_png",
     "name": "Minion",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Minion.png",
+    "overlay_url": "/frames/1x4/Minion.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1487,14 +1526,15 @@
         "width": 795,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Minion_thumb.webp"
   },
   {
     "id": "1x4_newspaper_png",
     "name": "Newspaper",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/NewsPaper.png",
+    "overlay_url": "/frames/1x4/NewsPaper.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1525,14 +1565,15 @@
         "width": 516,
         "height": 375
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/NewsPaper_thumb.webp"
   },
   {
     "id": "1x4_porsche_png",
     "name": "Porsche",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Porsche.png",
+    "overlay_url": "/frames/1x4/Porsche.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1563,14 +1604,15 @@
         "width": 795,
         "height": 626
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Porsche_thumb.webp"
   },
   {
     "id": "1x4_powerpuff_png",
     "name": "Powerpuff",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Powerpuff.png",
+    "overlay_url": "/frames/1x4/Powerpuff.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1601,14 +1643,15 @@
         "width": 780,
         "height": 614
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Powerpuff_thumb.webp"
   },
   {
     "id": "1x4_retro_windows_png",
     "name": "Retro Windows",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Retro%20Windows.png",
+    "overlay_url": "/frames/1x4/Retro%20Windows.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1639,14 +1682,15 @@
         "width": 787,
         "height": 520
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Retro%20Windows_thumb.webp"
   },
   {
     "id": "1x4_save_the_date_png",
     "name": "Save The Date",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Save%20the%20date.png",
+    "overlay_url": "/frames/1x4/Save%20the%20date.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1677,14 +1721,15 @@
         "width": 718,
         "height": 669
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Save%20the%20date_thumb.webp"
   },
   {
     "id": "1x4_shinchanpink_png",
     "name": "Shinchanpink",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/ShinChanPink.png",
+    "overlay_url": "/frames/1x4/ShinChanPink.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1715,14 +1760,15 @@
         "width": 780,
         "height": 614
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/ShinChanPink_thumb.webp"
   },
   {
     "id": "1x4_shinnosuke_png",
     "name": "Shinnosuke",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/shinnosuke.png",
+    "overlay_url": "/frames/1x4/shinnosuke.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1753,14 +1799,15 @@
         "width": 780,
         "height": 614
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/shinnosuke_thumb.webp"
   },
   {
     "id": "1x4_steven_universe_png",
     "name": "Steven Universe",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Steven%20Universe.png",
+    "overlay_url": "/frames/1x4/Steven%20Universe.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1791,14 +1838,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Steven%20Universe_thumb.webp"
   },
   {
     "id": "1x4_stitch_png",
     "name": "Stitch",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Stitch.png",
+    "overlay_url": "/frames/1x4/Stitch.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1829,14 +1877,15 @@
         "width": 780,
         "height": 612
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Stitch_thumb.webp"
   },
   {
     "id": "1x4_tinder_png",
     "name": "Tinder",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Tinder.png",
+    "overlay_url": "/frames/1x4/Tinder.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1867,14 +1916,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Tinder_thumb.webp"
   },
   {
     "id": "1x4_toystory_png",
     "name": "Toystory",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/ToyStory.png",
+    "overlay_url": "/frames/1x4/ToyStory.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1905,14 +1955,15 @@
         "width": 780,
         "height": 612
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/ToyStory_thumb.webp"
   },
   {
     "id": "1x4_triples_3rd_anniversary_png",
     "name": "Triples 3rd Anniversary",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/tripleS%203rd%20anniversary.png",
+    "overlay_url": "/frames/1x4/tripleS%203rd%20anniversary.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1943,14 +1994,15 @@
         "width": 1753,
         "height": 1397
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/tripleS%203rd%20anniversary_thumb.webp"
   },
   {
     "id": "1x4_tv_png",
     "name": "Tv",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/TV.png",
+    "overlay_url": "/frames/1x4/TV.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "Classic 4-cut vertical photostrip",
@@ -1981,14 +2033,15 @@
         "width": 792,
         "height": 642
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/TV_thumb.webp"
   },
   {
     "id": "1x4_vintage1_png",
     "name": "Vintage1",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Vintage1.png",
+    "overlay_url": "/frames/1x4/Vintage1.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "Classic 4-cut vertical photostrip",
@@ -2019,14 +2072,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Vintage1_thumb.webp"
   },
   {
     "id": "1x4_vintage2_png",
     "name": "Vintage2",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Vintage2.png",
+    "overlay_url": "/frames/1x4/Vintage2.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "Classic 4-cut vertical photostrip",
@@ -2057,14 +2111,15 @@
         "width": 797,
         "height": 629
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Vintage2_thumb.webp"
   },
   {
     "id": "1x4_weareone_png",
     "name": "Weareone",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/WeAreOne.png",
+    "overlay_url": "/frames/1x4/WeAreOne.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -2095,14 +2150,15 @@
         "width": 789,
         "height": 621
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/WeAreOne_thumb.webp"
   },
   {
     "id": "1x4_zeus_tbtw_png",
     "name": "Zeus Tbtw",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/ZEUS%20TBTW.png",
+    "overlay_url": "/frames/1x4/ZEUS%20TBTW.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "Classic 4-cut vertical photostrip",
@@ -2133,14 +2189,15 @@
         "width": 786,
         "height": 568
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/ZEUS%20TBTW_thumb.webp"
   },
   {
     "id": "1x4_zootopia_png",
     "name": "Zootopia",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/Zootopia.png",
+    "overlay_url": "/frames/1x4/Zootopia.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "Classic 4-cut vertical photostrip",
@@ -2171,14 +2228,15 @@
         "width": 797,
         "height": 627
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/Zootopia_thumb.webp"
   },
   {
     "id": "1x4_____________________________zeka_png",
     "name": "아가공'𝑠 𝑂𝑑𝑦𝑠𝑠𝑒𝑦 — Zeka",
     "category": "1x4",
     "layout_type": "1x4",
-    "overlay_url": "/frames/1x4/%E1%84%8B%E1%85%A1%E1%84%80%E1%85%A1%E1%84%80%E1%85%A9%E1%86%BC'%F0%9D%91%A0%20%F0%9D%91%82%F0%9D%91%91%F0%9D%91%A6%F0%9D%91%A0%F0%9D%91%A0%F0%9D%91%92%F0%9D%91%A6%20%E2%80%94%20ZEKA.png",
+    "overlay_url": "/frames/1x4/%E1%84%8B%E1%85%A1%E1%84%80%E1%85%A1%E1%84%80%E1%85%A9%E1%86%BC'%F0%9D%91%A0%20%F0%9D%91%82%F0%9D%91%91%F0%9D%91%A6%F0%9D%91%A0%F0%9D%91%A0%F0%9D%91%92%F0%9D%91%A6%20%E2%80%94%20ZEKA.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "Classic 4-cut vertical photostrip",
@@ -2209,14 +2267,15 @@
         "width": 739,
         "height": 463
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/1x4/%E1%84%8B%E1%85%A1%E1%84%80%E1%85%A1%E1%84%80%E1%85%A9%E1%86%BC'%F0%9D%91%A0%20%F0%9D%91%82%F0%9D%91%91%F0%9D%91%A6%F0%9D%91%A0%F0%9D%91%A0%F0%9D%91%92%F0%9D%91%A6%20%E2%80%94%20ZEKA_thumb.webp"
   },
   {
     "id": "2x2_01_retro_png",
     "name": "Retro",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/01_Retro.png",
+    "overlay_url": "/frames/2x2/01_Retro.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "4-cut modern square grid",
@@ -2247,14 +2306,15 @@
         "width": 558,
         "height": 737
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/01_Retro_thumb.webp"
   },
   {
     "id": "2x2_02_basic_5_png",
     "name": "Basic 5",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/02_Basic-5.png",
+    "overlay_url": "/frames/2x2/02_Basic-5.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "4-cut modern square grid",
@@ -2285,14 +2345,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/02_Basic-5_thumb.webp"
   },
   {
     "id": "2x2_03_basic_1_png",
     "name": "Basic 1",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/03_Basic-1.png",
+    "overlay_url": "/frames/2x2/03_Basic-1.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "4-cut modern square grid",
@@ -2323,14 +2384,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/03_Basic-1_thumb.webp"
   },
   {
     "id": "2x2_04_matcha_png",
     "name": "Matcha",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/04_Matcha.png",
+    "overlay_url": "/frames/2x2/04_Matcha.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "4-cut modern square grid",
@@ -2361,14 +2423,15 @@
         "width": 457,
         "height": 661
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/04_Matcha_thumb.webp"
   },
   {
     "id": "2x2_05_xinhhairlines_png",
     "name": "Xinhhairlines",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/05_XinhhAirlines.png",
+    "overlay_url": "/frames/2x2/05_XinhhAirlines.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "4-cut modern square grid",
@@ -2399,14 +2462,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/05_XinhhAirlines_thumb.webp"
   },
   {
     "id": "2x2_06_wearebear_png",
     "name": "Wearebear",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/06_WeAreBear.png",
+    "overlay_url": "/frames/2x2/06_WeAreBear.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "4-cut modern square grid",
@@ -2437,14 +2501,15 @@
         "width": 532,
         "height": 749
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/06_WeAreBear_thumb.webp"
   },
   {
     "id": "2x2_08_girly_png",
     "name": "Girly",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/08_Girly.png",
+    "overlay_url": "/frames/2x2/08_Girly.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "4-cut modern square grid",
@@ -2475,14 +2540,15 @@
         "width": 545,
         "height": 726
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/08_Girly_thumb.webp"
   },
   {
     "id": "2x2_09_basic_4_png",
     "name": "Basic 4",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/09_Basic-4.png",
+    "overlay_url": "/frames/2x2/09_Basic-4.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "4-cut modern square grid",
@@ -2513,14 +2579,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/09_Basic-4_thumb.webp"
   },
   {
     "id": "2x2_11_lunar_new_year_png",
     "name": "Lunar New Year",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/11_Lunar_New_Year.png",
+    "overlay_url": "/frames/2x2/11_Lunar_New_Year.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "4-cut modern square grid",
@@ -2551,14 +2618,15 @@
         "width": 514,
         "height": 528
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/11_Lunar_New_Year_thumb.webp"
   },
   {
     "id": "2x2_12_style_girl_png",
     "name": "Style Girl",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/12_Style_Girl.png",
+    "overlay_url": "/frames/2x2/12_Style_Girl.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "4-cut modern square grid",
@@ -2589,14 +2657,15 @@
         "width": 1120,
         "height": 1094
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/12_Style_Girl_thumb.webp"
   },
   {
     "id": "2x2_13_basic_3_png",
     "name": "Basic 3",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/13_Basic-3.png",
+    "overlay_url": "/frames/2x2/13_Basic-3.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "4-cut modern square grid",
@@ -2627,14 +2696,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/13_Basic-3_thumb.webp"
   },
   {
     "id": "2x2_14_basic_6_png",
     "name": "Basic 6",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/14_Basic-6.png",
+    "overlay_url": "/frames/2x2/14_Basic-6.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "4-cut modern square grid",
@@ -2665,14 +2735,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/14_Basic-6_thumb.webp"
   },
   {
     "id": "2x2_17_cream_soda_png",
     "name": "Cream Soda",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/17_cream-soda.png",
+    "overlay_url": "/frames/2x2/17_cream-soda.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "4-cut modern square grid",
@@ -2703,14 +2774,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/17_cream-soda_thumb.webp"
   },
   {
     "id": "2x2_18_sweet_moments_png",
     "name": "Sweet Moments",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/18_Sweet_Moments.png",
+    "overlay_url": "/frames/2x2/18_Sweet_Moments.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "4-cut modern square grid",
@@ -2741,14 +2813,15 @@
         "width": 421,
         "height": 495
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/18_Sweet_Moments_thumb.webp"
   },
   {
     "id": "2x2_19_retro_windows_png",
     "name": "Retro Windows",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/19_Retro_Windows.png",
+    "overlay_url": "/frames/2x2/19_Retro_Windows.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "4-cut modern square grid",
@@ -2779,14 +2852,15 @@
         "width": 532,
         "height": 695
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/19_Retro_Windows_thumb.webp"
   },
   {
     "id": "2x2_20_basic_7_png",
     "name": "Basic 7",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/20_Basic-7.png",
+    "overlay_url": "/frames/2x2/20_Basic-7.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "4-cut modern square grid",
@@ -2817,14 +2891,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/20_Basic-7_thumb.webp"
   },
   {
     "id": "2x2_21_zeka_png",
     "name": "Zeka",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/21_ZEKA.png",
+    "overlay_url": "/frames/2x2/21_ZEKA.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "4-cut modern square grid",
@@ -2855,14 +2930,15 @@
         "width": 716,
         "height": 1079
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/21_ZEKA_thumb.webp"
   },
   {
     "id": "2x2_22_amazing_png",
     "name": "Amazing",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/22_Amazing.png",
+    "overlay_url": "/frames/2x2/22_Amazing.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "4-cut modern square grid",
@@ -2893,14 +2969,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/22_Amazing_thumb.webp"
   },
   {
     "id": "2x2_23_hello_kitty_png",
     "name": "Hello Kitty",
     "category": "2x2",
     "layout_type": "2x2",
-    "overlay_url": "/frames/2x2/23_Hello_Kitty.png",
+    "overlay_url": "/frames/2x2/23_Hello_Kitty.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "4-cut modern square grid",
@@ -2931,14 +3008,15 @@
         "width": 545,
         "height": 720
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x2/23_Hello_Kitty_thumb.webp"
   },
   {
     "id": "2x3_01_lucky_png",
     "name": "Lucky",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/01_Lucky.png",
+    "overlay_url": "/frames/2x3/01_Lucky.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "6-cut dual column grid",
@@ -2981,14 +3059,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/01_Lucky_thumb.webp"
   },
   {
     "id": "2x3_02_basic_4_png",
     "name": "Basic 4",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/02_Basic-4.png",
+    "overlay_url": "/frames/2x3/02_Basic-4.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "6-cut dual column grid",
@@ -3031,14 +3110,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/02_Basic-4_thumb.webp"
   },
   {
     "id": "2x3_03_shinosuke_png",
     "name": "Shinosuke",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/03_shinosuke.png",
+    "overlay_url": "/frames/2x3/03_shinosuke.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "6-cut dual column grid",
@@ -3081,14 +3161,15 @@
         "width": 545,
         "height": 415
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/03_shinosuke_thumb.webp"
   },
   {
     "id": "2x3_04_basic_3_png",
     "name": "Basic 3",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/04_Basic-3.png",
+    "overlay_url": "/frames/2x3/04_Basic-3.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "6-cut dual column grid",
@@ -3131,14 +3212,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/04_Basic-3_thumb.webp"
   },
   {
     "id": "2x3_05_loopy_png",
     "name": "Loopy",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/05_Loopy.png",
+    "overlay_url": "/frames/2x3/05_Loopy.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "6-cut dual column grid",
@@ -3181,14 +3263,15 @@
         "width": 559,
         "height": 420
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/05_Loopy_thumb.webp"
   },
   {
     "id": "2x3_06_jeans_png",
     "name": "Jeans",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/06_Jeans.png",
+    "overlay_url": "/frames/2x3/06_Jeans.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "6-cut dual column grid",
@@ -3231,14 +3314,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/06_Jeans_thumb.webp"
   },
   {
     "id": "2x3_07_powerpuff_png",
     "name": "Powerpuff",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/07_Powerpuff.png",
+    "overlay_url": "/frames/2x3/07_Powerpuff.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "6-cut dual column grid",
@@ -3281,14 +3365,15 @@
         "width": 545,
         "height": 415
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/07_Powerpuff_thumb.webp"
   },
   {
     "id": "2x3_08_y2k_png",
     "name": "Y2k",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/08_Y2K.png",
+    "overlay_url": "/frames/2x3/08_Y2K.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "6-cut dual column grid",
@@ -3331,14 +3416,15 @@
         "width": 559,
         "height": 420
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/08_Y2K_thumb.webp"
   },
   {
     "id": "2x3_09_basic_5_png",
     "name": "Basic 5",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/09_Basic-5.png",
+    "overlay_url": "/frames/2x3/09_Basic-5.webp",
     "accent_color": "#06b6d4",
     "thumbnail_gradient": "linear-gradient(135deg, #a18cd1, #fbc2eb)",
     "description": "6-cut dual column grid",
@@ -3381,14 +3467,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/09_Basic-5_thumb.webp"
   },
   {
     "id": "2x3_10_basic_1_png",
     "name": "Basic 1",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/10_Basic-1.png",
+    "overlay_url": "/frames/2x3/10_Basic-1.webp",
     "accent_color": "#10b981",
     "thumbnail_gradient": "linear-gradient(135deg, #ff9a9e, #fecfef)",
     "description": "6-cut dual column grid",
@@ -3431,14 +3518,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/10_Basic-1_thumb.webp"
   },
   {
     "id": "2x3_11_basic_2_png",
     "name": "Basic 2",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/11_Basic-2.png",
+    "overlay_url": "/frames/2x3/11_Basic-2.webp",
     "accent_color": "#f59e0b",
     "thumbnail_gradient": "linear-gradient(135deg, #84fab0, #8fd3f4)",
     "description": "6-cut dual column grid",
@@ -3481,14 +3569,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/11_Basic-2_thumb.webp"
   },
   {
     "id": "2x3_12_hellokitty_png",
     "name": "Hellokitty",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/12_HelloKitty.png",
+    "overlay_url": "/frames/2x3/12_HelloKitty.webp",
     "accent_color": "#ec4899",
     "thumbnail_gradient": "linear-gradient(135deg, #cfd9df, #e2ebf0)",
     "description": "6-cut dual column grid",
@@ -3531,14 +3620,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/12_HelloKitty_thumb.webp"
   },
   {
     "id": "2x3_13_2026_png",
     "name": "13_2026",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/13_2026.png",
+    "overlay_url": "/frames/2x3/13_2026.webp",
     "accent_color": "#3b82f6",
     "thumbnail_gradient": "linear-gradient(135deg, #fccb90, #d57eeb)",
     "description": "6-cut dual column grid",
@@ -3581,14 +3671,15 @@
         "width": 557,
         "height": 422
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/13_2026_thumb.webp"
   },
   {
     "id": "2x3_2x3_denim_scrapbook_png",
     "name": "X3 Denim Scrapbook",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/2x3-denim-scrapbook.png",
+    "overlay_url": "/frames/2x3/2x3-denim-scrapbook.webp",
     "accent_color": "#ff5e97",
     "thumbnail_gradient": "linear-gradient(135deg, #f093fb, #f5576c)",
     "description": "6-cut dual column grid",
@@ -3631,14 +3722,15 @@
         "width": 543,
         "height": 631
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/2x3-denim-scrapbook_thumb.webp"
   },
   {
     "id": "2x3_2x3_moodboard_panda_png",
     "name": "X3 Moodboard Panda",
     "category": "2x3",
     "layout_type": "2x3",
-    "overlay_url": "/frames/2x3/2x3-moodboard-panda.png",
+    "overlay_url": "/frames/2x3/2x3-moodboard-panda.webp",
     "accent_color": "#8b5cf6",
     "thumbnail_gradient": "linear-gradient(135deg, #5ee7df, #b490ca)",
     "description": "6-cut dual column grid",
@@ -3681,6 +3773,7 @@
         "width": 450,
         "height": 543
       }
-    ]
+    ],
+    "thumbnail_url": "/frames/2x3/2x3-moodboard-panda_thumb.webp"
   }
 ]

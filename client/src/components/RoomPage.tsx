@@ -15,7 +15,7 @@ import FrameSelection from './FrameSelection';
 import ResultPage from './ResultPage';
 import StepHeader from './StepHeader';
 import RoomChat from './RoomChat';
-import { CameraIcon, UserIcon, InfoIcon, HomeIcon, LockIcon, SearchIcon, SparklesIcon, ArrowRightIcon } from './Icons';
+import { CameraIcon, UserIcon, InfoIcon, HomeIcon, LockIcon, SearchIcon, SparklesIcon, ArrowRightIcon, CheckIcon } from './Icons';
 import { resolveMediaUrl, getServerUrl } from '@/lib/config';
 import { useLanguage } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -26,12 +26,13 @@ interface RoomPageProps {
   code: string;
 }
 
-type AppPhase = 'loading' | 'name_entry' | 'lobby' | 'capturing' | 'photo_selection' | 'frame_selection' | 'rendering' | 'completed' | 'error';
+type AppPhase = 'loading' | 'name_entry' | 'lobby' | 'capturing' | 'photo_selection' | 'frame_selection' | 'rendering' | 'completed' | 'error' | 'destroyed';
 
 export default function RoomPage({ code }: RoomPageProps) {
   const router = useRouter();
   const { t } = useLanguage();
   const [phase, setPhase] = useState<AppPhase>('loading');
+  const [destroyedMessage, setDestroyedMessage] = useState('');
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [slots, setSlots] = useState<PairedShot[]>([]);
@@ -156,8 +157,8 @@ export default function RoomPage({ code }: RoomPageProps) {
     socket.on('room:destroyed', ({ message }: { message?: string }) => {
       if (!active) return;
       stopLocalStream();
-      alert(message || 'Seluruh data sesi, foto, dan histori telah dihapus secara permanen dari server.');
-      router.push('/');
+      setDestroyedMessage(message || 'Seluruh data sesi, foto, dan histori telah dihapus secara permanen dari server.');
+      setPhase('destroyed');
     });
 
     async function initRoomAndJoin() {
@@ -637,6 +638,56 @@ export default function RoomPage({ code }: RoomPageProps) {
 
           <div style={{ marginTop: '22px', fontSize: '11px', color: 'var(--text-muted)' }}>
             Online Photo Booth • Abadikan Momen Bersama
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (phase === 'destroyed') {
+    return (
+      <main className="not-found-wrapper">
+        <div className="not-found-card" style={{ maxWidth: '480px', padding: '36px 26px', textAlign: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '2px solid var(--accent-green)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--accent-green)',
+            margin: '0 auto 16px auto',
+          }}>
+            <CheckIcon size={32} />
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '8px', color: 'white' }}>
+            Sesi Telah Dihapus Permanen
+          </h2>
+          <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '24px' }}>
+            {destroyedMessage || 'Seluruh data sesi, file foto capture, dan histori ruangan telah dibersihkan secara permanen dari server demi privasi Anda.'}
+          </p>
+          <a
+            href="/"
+            className="btn btn-primary"
+            id="destroyed-home-btn"
+            style={{
+              width: '100%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontWeight: 700,
+              padding: '12px 20px',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              border: 'none',
+            }}
+          >
+            <HomeIcon size={18} /> Kembali ke Beranda
+          </a>
+          <div style={{ marginTop: '18px', fontSize: '11px', color: 'var(--text-muted)' }}>
+            Privasi Terjamin • Semua file sesi telah dimusnahkan
           </div>
         </div>
       </main>

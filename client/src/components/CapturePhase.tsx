@@ -208,6 +208,8 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const bgRef = useRef<VirtualBackground>(selectedBg);
   bgRef.current = selectedBg;
   const customFileInputRef = useRef<HTMLInputElement>(null);
+  const [bgToastMessage, setBgToastMessage] = useState<string | null>(null);
+  const [confirmDeleteBgId, setConfirmDeleteBgId] = useState<string | null>(null);
 
   // Sync public community custom backgrounds (shared globally with all users across all rooms)
   useEffect(() => {
@@ -297,7 +299,8 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     if (!file) return;
 
     if (file.size > 15 * 1024 * 1024) {
-      alert('Ukuran gambar maksimal 15MB.');
+      setBgToastMessage('Ukuran gambar maksimal 15MB.');
+      setTimeout(() => setBgToastMessage(null), 3500);
       return;
     }
 
@@ -385,8 +388,14 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     bgControllerRef.current?.updateBackground(noneBg);
   };
 
-  const handleRemoveSharedBg = async (bgId: string) => {
-    if (!confirm('Hapus background publik ini dari daftar semua orang?')) return;
+  const handleRemoveSharedBg = (bgId: string) => {
+    setConfirmDeleteBgId(bgId);
+  };
+
+  const executeRemoveSharedBg = async () => {
+    if (!confirmDeleteBgId) return;
+    const bgId = confirmDeleteBgId;
+    setConfirmDeleteBgId(null);
 
     try {
       await fetch(`${getServerUrl()}/api/backgrounds/${bgId}`, {
@@ -1669,6 +1678,86 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* In-App Toast Notification */}
+      {bgToastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(239, 68, 68, 0.95)',
+          color: 'white',
+          padding: '10px 18px',
+          borderRadius: 'var(--radius-full)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          zIndex: 99999,
+          fontSize: '13px',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <span>{bgToastMessage}</span>
+          <button
+            onClick={() => setBgToastMessage(null)}
+            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 800 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* In-App Shared Background Deletion Confirmation Modal */}
+      {confirmDeleteBgId && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(5, 7, 15, 0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+        }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '26px 22px',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'white', marginBottom: '8px' }}>
+              Hapus Background Publik?
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '20px' }}>
+              Background ini akan dihapus permanen dari galeri komunitas untuk semua orang.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setConfirmDeleteBgId(null)}
+                style={{ flex: 1 }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={executeRemoveSharedBg}
+                style={{ flex: 1 }}
+              >
+                Ya, Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -11,6 +11,7 @@ export interface CutoutBox {
 export interface ExtendedFrameTemplate extends FrameTemplate {
   category?: '1x3' | '1x4' | '2x2' | '2x3' | 'custom';
   overlay_url?: string;
+  thumbnail_url?: string;
   frameWidth?: number;
   frameHeight?: number;
   cutoutBoxes?: CutoutBox[];

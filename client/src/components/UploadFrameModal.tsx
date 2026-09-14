@@ -52,8 +52,9 @@ export default function UploadFrameModal({ isOpen, onClose, onFrameCreated }: Up
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    if (!selected.type.includes('png') && !selected.name.toLowerCase().endsWith('.png')) {
-      setErrorMsg('Harap unggah file PNG dengan transparansi untuk deteksi lubang foto optimal.');
+    const isPngOrWebp = selected.type.includes('png') || selected.type.includes('webp') || selected.name.toLowerCase().endsWith('.png') || selected.name.toLowerCase().endsWith('.webp');
+    if (!isPngOrWebp) {
+      setErrorMsg('Harap unggah file PNG atau WebP dengan transparansi untuk deteksi lubang foto optimal.');
     } else {
       setErrorMsg('');
     }
@@ -185,7 +186,7 @@ export default function UploadFrameModal({ isOpen, onClose, onFrameCreated }: Up
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/*"
+              accept="image/png,image/webp,image/*"
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />
@@ -193,9 +194,9 @@ export default function UploadFrameModal({ isOpen, onClose, onFrameCreated }: Up
               <UploadIcon size={26} />
             </div>
             <div>
-              <p style={{ fontWeight: 700, fontSize: '14px', color: 'white' }}>Pilih atau Seret File PNG Frame</p>
+              <p style={{ fontWeight: 700, fontSize: '14px', color: 'white' }}>Pilih atau Seret File Frame (PNG / WebP)</p>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Disarankan PNG dengan background transparan pada area foto (Canva / Photoshop)
+                Disarankan file PNG atau WebP transparan pada area foto (Canva / Photoshop)
               </p>
             </div>
           </div>

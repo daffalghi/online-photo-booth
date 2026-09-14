@@ -37,6 +37,8 @@ export default function ResultPage({
   const [copied, setCopied] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isDeletedSuccess, setIsDeletedSuccess] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const template = FRAME_TEMPLATES.find((t) => t.id === frameTemplateId) ?? FRAME_TEMPLATES[0];
   const accentColor = customization?.accentColor || template.accent_color;
@@ -62,11 +64,11 @@ export default function ResultPage({
       isSolo,
     )
       .then(() => setCompositing(false))
-      .catch((e: unknown) => {
-        console.error(e);
+      .catch((err) => {
+        console.error('Local compositing error:', err);
         setCompositing(false);
       });
-  }, [slots, template, captionText, accentColor, room.settings.selectedPhotoOrder, room.settings.photoOffsets, downloadUrlPng, isSolo]);
+  }, [slots, template, captionText, accentColor, downloadUrlPng, room.settings.selectedPhotoOrder, isSolo]);
 
   // QR code generation
   useEffect(() => {
@@ -122,6 +124,7 @@ export default function ResultPage({
 
   async function handleDestroySession() {
     setIsDeleting(true);
+    setDeleteError('');
     try {
       if (socket) {
         socket.emit('room:destroy', { roomId: room.id });
@@ -129,14 +132,17 @@ export default function ResultPage({
       await fetch(`${getServerUrl()}/api/rooms/${room.code}/destroy`, {
         method: 'POST',
       });
-      alert('Seluruh data sesi, foto, dan histori Anda telah dihapus secara permanen dari server.');
-      router.push('/');
-    } catch (err) {
-      console.error(err);
-      alert('Gagal menghapus data sesi. Namun file akan otomatis terhapus dalam 2 jam.');
-    } finally {
       setIsDeleting(false);
       setShowConfirmDelete(false);
+      setIsDeletedSuccess(true);
+      setTimeout(() => {
+        router.push('/');
+      }, 2200);
+    } catch (err) {
+      console.error(err);
+      setIsDeleting(false);
+      setShowConfirmDelete(false);
+      setDeleteError('Gagal memusnahkan data sesi. Namun file akan otomatis terhapus dalam 2 jam.');
     }
   }
 
@@ -357,6 +363,102 @@ export default function ResultPage({
       <div style={{ width: '100%', maxWidth: '680px', marginTop: '12px' }}>
         <CreatorCard />
       </div>
+
+      {/* In-App Deletion Error Banner */}
+      {deleteError && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(239, 68, 68, 0.95)',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          fontSize: '13px',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <span>{deleteError}</span>
+          <button
+            onClick={() => setDeleteError('')}
+            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 800 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* In-App Deletion Success Modal (No ugly localhost alert!) */}
+      {isDeletedSuccess && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(5, 7, 15, 0.88)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          animation: 'fadeIn 200ms ease',
+        }}>
+          <div style={{
+            background: '#0d111c',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(16, 185, 129, 0.25)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '32px 26px',
+            maxWidth: '440px',
+            width: '100%',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '2px solid var(--accent-green)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-green)',
+              marginBottom: '16px',
+            }}>
+              <CheckIcon size={30} />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'white', marginBottom: '8px' }}>
+              Data Sesi Telah Dihapus!
+            </h3>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '22px' }}>
+              Seluruh foto, file capture, dan histori ruangan photobooth Anda telah dimusnahkan secara permanen dari server.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => router.push('/')}
+              style={{
+                width: '100%',
+                padding: '10px 18px',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                border: 'none',
+              }}
+            >
+              Kembali ke Beranda Sekarang
+            </button>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px' }}>
+              Mengalihkan otomatis ke beranda…
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

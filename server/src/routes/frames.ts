@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { nanoid } from 'nanoid';
 import knex from '../db';
+import sharp from 'sharp';
 import { detectCutoutBoxes, DetectedCutoutBox } from '../services/frameDetectorService';
 import generatedFrames from '../services/generatedFrames.json';
 import { FrameTemplate } from '../types';
@@ -66,6 +67,9 @@ router.get('/', async (_req: Request, res: Response) => {
         cutoutBoxes = [];
       }
 
+      const overlayUrl = row.overlay_key || undefined;
+      const thumbUrl = overlayUrl ? overlayUrl.replace(/\.(png|webp)$/i, '_thumb.webp') : undefined;
+
       return {
         id: row.id,
         name: row.name,
@@ -77,8 +81,10 @@ router.get('/', async (_req: Request, res: Response) => {
         accent_color: row.accent_color || '#ff5e97',
         thumbnailGradient: row.thumbnail_gradient || 'linear-gradient(135deg, #ff5e97, #8b5cf6)',
         thumbnail_gradient: row.thumbnail_gradient || 'linear-gradient(135deg, #ff5e97, #8b5cf6)',
-        overlayUrl: row.overlay_key || undefined,
-        overlay_url: row.overlay_key || undefined,
+        overlayUrl,
+        overlay_url: overlayUrl,
+        thumbnailUrl: thumbUrl,
+        thumbnail_url: thumbUrl,
         frameWidth: row.frame_width || 1200,
         frameHeight: row.frame_height || 1800,
         cutoutBoxes,
@@ -92,6 +98,8 @@ router.get('/', async (_req: Request, res: Response) => {
       accentColor: g.accentColor || g.accent_color || '#ff5e97',
       thumbnailGradient: g.thumbnailGradient || g.thumbnail_gradient || 'linear-gradient(135deg, #ff5e97, #8b5cf6)',
       overlayUrl: g.overlayUrl || g.overlay_url,
+      thumbnailUrl: g.thumbnailUrl || g.thumbnail_url,
+      thumbnail_url: g.thumbnail_url || g.thumbnailUrl,
     }));
 
     // Return custom frames first, followed by built-in frames
@@ -127,14 +135,29 @@ router.post('/upload', upload.single('frame'), async (req: Request, res: Respons
     // Run automatic cutout hole detection
     const detection = await detectCutoutBoxes(frameBuffer);
 
-    // Save image to shared frames upload folder
     const frameId = `custom_${Date.now()}_${nanoid(6)}`;
-    const fileName = `${frameId}.png`;
-    const filePath = path.join(FRAMES_DIR, fileName);
+    const fullWebpName = `${frameId}.webp`;
+    const fullWebpPath = path.join(FRAMES_DIR, fullWebpName);
+    const thumbFileName = `${frameId}_thumb.webp`;
+    const thumbPath = path.join(FRAMES_DIR, thumbFileName);
 
-    fs.writeFileSync(filePath, frameBuffer);
+    // 1. Convert uploaded frame to optimized full-resolution WebP (preserves 100% alpha transparency)
+    await sharp(frameBuffer)
+      .webp({ quality: 92, effort: 4 })
+      .toFile(fullWebpPath);
 
-    const overlayUrl = `/uploads/frames/${fileName}`;
+    // 2. Generate lightweight WebP thumbnail for sub-second gallery preview (~9 KB)
+    try {
+      await sharp(frameBuffer)
+        .resize({ height: 320, fit: 'inside' })
+        .webp({ quality: 85, effort: 4 })
+        .toFile(thumbPath);
+    } catch (e) {
+      console.warn('[Frames] Failed to generate custom frame thumbnail:', e);
+    }
+
+    const overlayUrl = `/uploads/frames/${fullWebpName}`;
+    const thumbnailUrl = `/uploads/frames/${thumbFileName}`;
 
     // Store in SQLite frame_templates table as a shared asset
     const newDbRow: FrameDbRow = {
@@ -168,6 +191,8 @@ router.post('/upload', upload.single('frame'), async (req: Request, res: Respons
       thumbnail_gradient: newDbRow.thumbnail_gradient,
       overlayUrl,
       overlay_url: overlayUrl,
+      thumbnailUrl,
+      thumbnail_url: thumbnailUrl,
       frameWidth: detection.width,
       frameHeight: detection.height,
       cutoutBoxes: detection.cutoutBoxes,

@@ -99,6 +99,8 @@ export interface FrameTemplate {
   thumbnail_gradient?: string;
   overlayUrl?: string;
   overlay_url?: string;
+  thumbnailUrl?: string;
+  thumbnail_url?: string;
   category?: string;
   frameWidth?: number;
   frameHeight?: number;

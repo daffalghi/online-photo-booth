@@ -356,7 +356,7 @@ export default function FrameSelection({ room, participants, myParticipantId, sl
 
               {/* Info */}
               <div style={{ padding: '8px 10px', background: 'var(--bg-card)' }}>
-                <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {template.name}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -461,11 +461,13 @@ function FrameThumbnail({ template, shots, accentColor }: { template: ExtendedFr
             );
           })}
 
-          {/* PNG Frame Overlay */}
+          {/* WebP Optimized Frame Overlay */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={template.overlay_url}
+            src={template.thumbnail_url || template.overlay_url}
             alt={template.name}
+            loading="lazy"
+            decoding="async"
             style={{
               position: 'absolute',
               inset: 0,
