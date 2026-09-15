@@ -143,6 +143,14 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
     io.to(roomId).emit('capture:filterUpdated', { filter });
   });
 
+  // ── Background changed by any participant ────────────────────────────────
+  socket.on('capture:setBackground', (payload: { roomId: string; background: unknown }) => {
+    const { roomId, background } = payload;
+    if (!roomId) return;
+    io.to(roomId).emit('capture:backgroundSelected', { background });
+  });
+
+
   // ── Frame uploaded from client ───────────────────────────────────────────
   socket.on('capture:frameUpload', async (payload: { roomId: string; slotIndex: number; photoDataUrl: string; filters: string[] }) => {
     const { roomId, slotIndex, photoDataUrl, filters } = payload;

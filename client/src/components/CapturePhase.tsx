@@ -26,6 +26,7 @@ import {
   flipCamera,
   subscribeMicState,
   subscribeCameraState,
+  replaceOutgoingVideoTrack,
 } from '@/lib/webrtc';
 import {
   CameraIcon,
@@ -288,10 +289,13 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     socket.emit('capture:setFilter', { roomId: room.id, filter: newFilter });
   };
 
-  const handleSelectBackground = (bg: VirtualBackground) => {
+  const handleSelectBackground = (bg: VirtualBackground, syncWithRoom = true) => {
     setSelectedBg(bg);
     bgRef.current = bg;
     bgControllerRef.current?.updateBackground(bg);
+    if (syncWithRoom) {
+      socket.emit('capture:setBackground', { roomId: room.id, background: bg });
+    }
   };
 
   const handleCustomBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,7 +318,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     reader.onload = async (event) => {
       const dataUrl = event.target?.result as string;
       if (dataUrl) {
-        // Instant camera preview locally
+        // Instant camera preview locally & sync with room
         const previewBg: VirtualBackground = {
           id: `local_preview_${Date.now()}`,
           name: bgTitle,
@@ -324,9 +328,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
           imageUrl: dataUrl,
           previewUrl: dataUrl,
         };
-        setSelectedBg(previewBg);
-        bgRef.current = previewBg;
-        bgControllerRef.current?.updateBackground(previewBg);
+        handleSelectBackground(previewBg, true);
 
         // Upload to server REST API and broadcast to ALL users globally
         try {
@@ -353,9 +355,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                 imageUrl: result.background.url,
                 previewUrl: result.background.url,
               };
-              setSelectedBg(uploadedBg);
-              bgRef.current = uploadedBg;
-              bgControllerRef.current?.updateBackground(uploadedBg);
+              handleSelectBackground(uploadedBg, true);
             }
           } else {
             // Fallback to socket upload
@@ -422,7 +422,28 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
 
   useEffect(() => {
     bgControllerRef.current?.updateBackground(selectedBg);
-  }, [selectedBg]);
+
+    // If virtual background is active and camera is on, stream the segmented canvas over WebRTC to partner
+    if (selectedBg.type !== 'none' && virtualCanvasRef.current && camOn) {
+      const timer = setTimeout(() => {
+        try {
+          const canvas = virtualCanvasRef.current as HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream };
+          if (canvas && typeof canvas.captureStream === 'function') {
+            const stream = canvas.captureStream(30);
+            const canvasTrack = stream?.getVideoTracks()[0];
+            if (canvasTrack) {
+              replaceOutgoingVideoTrack(canvasTrack);
+            }
+          }
+        } catch (e) {
+          console.warn('[WebRTC] captureStream error:', e);
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    } else {
+      replaceOutgoingVideoTrack(null);
+    }
+  }, [selectedBg, camOn]);
 
   // Virtual Background Controller Lifecycle
   useEffect(() => {
@@ -450,9 +471,16 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         filterRef.current = syncedFilter;
       }
     };
+    const onBgSelected = ({ background }: { background: VirtualBackground }) => {
+      if (background) {
+        handleSelectBackground(background, false);
+      }
+    };
     socket.on('capture:filterUpdated', onFilterUpdated);
+    socket.on('capture:backgroundSelected', onBgSelected);
     return () => {
       socket.off('capture:filterUpdated', onFilterUpdated);
+      socket.off('capture:backgroundSelected', onBgSelected);
     };
   }, [socket]);
 
@@ -515,13 +543,35 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const roundStatus: RoundStatus = room.currentRoundStatus;
   const isCaptureLocked = iAmReady || countdown !== null || roundStatus === 'counting_down';
 
+  const partnerStreamRef = useRef<MediaStream | undefined>(partnerStream);
+  useEffect(() => {
+    partnerStreamRef.current = partnerStream;
+  }, [partnerStream]);
+
   // Bind remote stream to remoteVideoRef in Duo mode
   useEffect(() => {
-    if (remoteVideoRef.current && partnerStream) {
-      remoteVideoRef.current.srcObject = partnerStream;
-      remoteVideoRef.current.play().catch(() => {});
+    if (remoteVideoRef.current) {
+      if (partnerStream) {
+        remoteVideoRef.current.srcObject = partnerStream;
+        remoteVideoRef.current.play().catch(() => {});
+      } else {
+        remoteVideoRef.current.srcObject = null;
+      }
     }
   }, [partnerStream, me?.side, roundStatus]);
+
+  const handleManualReconnect = () => {
+    if (partner) {
+      closePeerConnection(partner.id);
+    }
+    socket.emit('webrtc:ready', {
+      roomId: room.id,
+      participantId: myParticipantId,
+    });
+    if (partner && myParticipantId < partner.id) {
+      initiatePeerConnection(room.id, myParticipantId, partner.id);
+    }
+  };
 
   const lockedSlots = slots.filter((s) => s.status === 'locked');
   const currentSlot = slots.find((s) => s.slotIndex === slotIndex);
@@ -578,18 +628,56 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       if (streams.size > 0) setRemoteConnected(true);
     });
 
-    getLocalStream().then((stream) => {
-      if (stream) {
-        participants.forEach((p) => {
-          if (p.id !== myParticipantId) {
-            // Deterministic initiator (lower ID initiates)
-            if (myParticipantId < p.id) {
-              initiatePeerConnection(room.id, myParticipantId, p.id);
-            }
+    const announceReadyAndConnect = () => {
+      getLocalStream()
+        .then((stream) => {
+          if (stream) {
+            // Announce camera ready to all peers in the room
+            socket.emit('webrtc:ready', {
+              roomId: room.id,
+              participantId: myParticipantId,
+            });
+
+            // Proactively initiate if lower participant ID
+            participants.forEach((p) => {
+              if (p.id !== myParticipantId && myParticipantId < p.id) {
+                initiatePeerConnection(room.id, myParticipantId, p.id);
+              }
+            });
           }
+        })
+        .catch(console.error);
+    };
+
+    announceReadyAndConnect();
+
+    // When a peer announces they are ready (e.g. mounted camera, refreshed, or joined)
+    const handlePeerReady = ({ fromParticipantId }: { fromParticipantId: string }) => {
+      if (!fromParticipantId || fromParticipantId === myParticipantId) return;
+      console.log(`[WebRTC] Peer ${fromParticipantId} reported ready`);
+
+      if (myParticipantId < fromParticipantId) {
+        // Lower ID initiates the connection
+        initiatePeerConnection(room.id, myParticipantId, fromParticipantId);
+      } else {
+        // Higher ID replies with webrtc:ready to acknowledge readiness
+        socket.emit('webrtc:ready', {
+          roomId: room.id,
+          participantId: myParticipantId,
         });
       }
-    }).catch(console.error);
+    };
+
+    // When participant connection state changes on server (e.g. socket re-join after page refresh)
+    const handleParticipantConn = ({ participantId, connectionStatus }: { participantId: string; connectionStatus: string }) => {
+      if (participantId === myParticipantId) return;
+      if (connectionStatus === 'connected') {
+        console.log(`[WebRTC] Peer ${participantId} connected, re-announcing ready`);
+        announceReadyAndConnect();
+      } else if (connectionStatus === 'disconnected') {
+        closePeerConnection(participantId);
+      }
+    };
 
     const handleSignal = ({
       signal,
@@ -605,13 +693,33 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       }
     };
 
+    const handleSocketReconnect = () => {
+      announceReadyAndConnect();
+    };
+
+    socket.on('webrtc:ready', handlePeerReady);
+    socket.on('participant:connectionChanged', handleParticipantConn);
     socket.on('webrtc:signal', handleSignal);
+    socket.on('connect', handleSocketReconnect);
+
+    // Heartbeat auto-reconnect if partner stream is not established after 4.5s
+    const retryTimer = setInterval(() => {
+      if (!partnerStreamRef.current && socket.connected) {
+        console.log('[WebRTC] Stream not established yet, re-announcing ready...');
+        announceReadyAndConnect();
+      }
+    }, 4500);
+
     return () => {
+      clearInterval(retryTimer);
+      socket.off('webrtc:ready', handlePeerReady);
+      socket.off('participant:connectionChanged', handleParticipantConn);
       socket.off('webrtc:signal', handleSignal);
+      socket.off('connect', handleSocketReconnect);
       unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSolo, participants.length]);
+  }, [isSolo, myParticipantId, room.id, socket, participants.length]);
 
   // ─── Socket Events ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -666,23 +774,37 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       setFinishedParticipantIds(ids);
     };
 
+    const onRetakeRequested = () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
+      countdownIntervalRef.current = null;
+      captureTimeoutRef.current = null;
+      setCountdown(null);
+      setIAmReady(false);
+      setReadyParticipantIds([]);
+      setLocalKeepStatus([]);
+      setIFinished(false);
+    };
+
     socket.on('capture:readyStatus', onReadyStatus);
     socket.on('capture:countdown', onCountdown);
     socket.on('capture:keepStatus', onKeepStatus);
     socket.on('capture:finishStatus', onFinishStatus);
+    socket.on('capture:retakeRequested', onRetakeRequested);
 
     return () => {
       socket.off('capture:readyStatus', onReadyStatus);
       socket.off('capture:countdown', onCountdown);
       socket.off('capture:keepStatus', onKeepStatus);
       socket.off('capture:finishStatus', onFinishStatus);
+      socket.off('capture:retakeRequested', onRetakeRequested);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotIndex, socket]);
 
-  // Reset local state on round change
+  // Reset local state on round change or when round returns to waiting_ready
   useEffect(() => {
     setIAmReady(false);
     setReadyParticipantIds([]);
@@ -692,6 +814,16 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
   }, [slotIndex]);
+
+  useEffect(() => {
+    if (roundStatus === 'waiting_ready') {
+      if (!readyParticipantIds.includes(myParticipantId)) {
+        setIAmReady(false);
+      }
+      setCountdown(null);
+      setLocalKeepStatus([]);
+    }
+  }, [roundStatus, readyParticipantIds, myParticipantId]);
 
   // ─── Actions ────────────────────────────────────────────────────────────────
   function handleTakePhoto() {
@@ -1018,9 +1150,17 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: showPreview ? 'none' : 'block', transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
                 {!partnerStream && !showPreview && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,18,0.85)', gap: '8px', padding: '16px', textAlign: 'center' }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,18,0.88)', gap: '10px', padding: '16px', textAlign: 'center', zIndex: 12 }}>
                     <span className="spinner" />
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Menghubungkan ke partner…</span>
+                    <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Menghubungkan ke partner…</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={handleManualReconnect}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '6px', marginTop: '4px', cursor: 'pointer' }}
+                    >
+                      <RefreshCwIcon size={12} /> Hubungkan Ulang
+                    </button>
                   </div>
                 )}
                 {showPreview && (
@@ -1088,9 +1228,17 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: showPreview ? 'none' : 'block', transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
                 />
                 {!partnerStream && !showPreview && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,18,0.85)', gap: '8px', padding: '16px', textAlign: 'center' }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,18,0.88)', gap: '10px', padding: '16px', textAlign: 'center', zIndex: 12 }}>
                     <span className="spinner" />
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Menghubungkan ke partner…</span>
+                    <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Menghubungkan ke partner…</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={handleManualReconnect}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '6px', marginTop: '4px', cursor: 'pointer' }}
+                    >
+                      <RefreshCwIcon size={12} /> Hubungkan Ulang
+                    </button>
                   </div>
                 )}
                 {showPreview && (

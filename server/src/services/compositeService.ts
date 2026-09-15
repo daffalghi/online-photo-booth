@@ -90,7 +90,6 @@ function getLayoutConfig(template: FrameTemplate, isSolo = false): LayoutConfig 
   if (cat === '1x3') {
     const singleW = fW;
     const singleH = fH;
-    const gap = Math.round(singleW * 0.05);
 
     const fallbackBoxes: CutoutBox[] = [
       { x: singleW * 0.07, y: singleH * 0.04, width: singleW * 0.86, height: singleH * 0.28 },
@@ -106,39 +105,15 @@ function getLayoutConfig(template: FrameTemplate, isSolo = false): LayoutConfig 
       height: b.height,
     }));
 
-    if (isSolo) {
-      return {
-        width: singleW,
-        height: singleH,
-        leftBoxes,
-        rightBoxes: [],
-        isTwinStrip: false,
-        singleStripWidth: singleW,
-        singleStripHeight: singleH,
-        gap: 0,
-        layoutType: '1x3',
-      };
-    }
-
-    const canvasW = singleW * 2 + gap;
-    const canvasH = singleH;
-
-    const rightBoxes: FrameBox[] = actualBoxes.slice(0, 3).map((b) => ({
-      x: b.x + singleW + gap,
-      y: b.y,
-      width: b.width,
-      height: b.height,
-    }));
-
     return {
-      width: canvasW,
-      height: canvasH,
+      width: singleW,
+      height: singleH,
       leftBoxes,
-      rightBoxes,
-      isTwinStrip: true,
+      rightBoxes: [],
+      isTwinStrip: false,
       singleStripWidth: singleW,
       singleStripHeight: singleH,
-      gap,
+      gap: 0,
       layoutType: '1x3',
     };
   }
@@ -146,7 +121,6 @@ function getLayoutConfig(template: FrameTemplate, isSolo = false): LayoutConfig 
   if (cat === '1x4') {
     const singleW = fW;
     const singleH = fH;
-    const gap = Math.round(singleW * 0.05);
 
     const fallbackBoxes: CutoutBox[] = [
       { x: singleW * 0.065, y: singleH * 0.028, width: singleW * 0.87, height: singleH * 0.218 },
@@ -163,39 +137,15 @@ function getLayoutConfig(template: FrameTemplate, isSolo = false): LayoutConfig 
       height: b.height,
     }));
 
-    if (isSolo) {
-      return {
-        width: singleW,
-        height: singleH,
-        leftBoxes,
-        rightBoxes: [],
-        isTwinStrip: false,
-        singleStripWidth: singleW,
-        singleStripHeight: singleH,
-        gap: 0,
-        layoutType: '1x4',
-      };
-    }
-
-    const canvasW = singleW * 2 + gap;
-    const canvasH = singleH;
-
-    const rightBoxes: FrameBox[] = actualBoxes.slice(0, 4).map((b) => ({
-      x: b.x + singleW + gap,
-      y: b.y,
-      width: b.width,
-      height: b.height,
-    }));
-
     return {
-      width: canvasW,
-      height: canvasH,
+      width: singleW,
+      height: singleH,
       leftBoxes,
-      rightBoxes,
-      isTwinStrip: true,
+      rightBoxes: [],
+      isTwinStrip: false,
       singleStripWidth: singleW,
       singleStripHeight: singleH,
-      gap,
+      gap: 0,
       layoutType: '1x4',
     };
   }

@@ -71,4 +71,11 @@ export function handleVoteEvents(io: Server, socket: AppSocket, baseUrl: string)
       targetParticipantId: payload.targetParticipantId,
     });
   });
+
+  socket.on('webrtc:ready', (payload: { roomId: string; participantId?: string }) => {
+    socket.to(payload.roomId).emit('webrtc:ready', {
+      fromParticipantId: payload.participantId || socket.participantId,
+    });
+  });
 }
+

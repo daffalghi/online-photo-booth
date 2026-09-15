@@ -428,7 +428,33 @@ export function stopLocalStream(): void {
       });
     } catch (_) {}
   });
+  currentCustomVideoTrack = null;
 }
+
+let currentCustomVideoTrack: MediaStreamTrack | null = null;
+
+/**
+ * Dynamically replace the outgoing video track (e.g. segmented virtual background canvas track)
+ * across all active WebRTC peer connections without reconnecting.
+ */
+export async function replaceOutgoingVideoTrack(newTrack: MediaStreamTrack | null): Promise<void> {
+  currentCustomVideoTrack = newTrack;
+  const targetTrack = newTrack || (localStream?.getVideoTracks()[0] || null);
+
+  for (const pc of peerConnections.values()) {
+    const senders = pc.getSenders();
+    for (const sender of senders) {
+      if (sender.track?.kind === 'video' || (!sender.track && targetTrack)) {
+        try {
+          await sender.replaceTrack(targetTrack);
+        } catch (err) {
+          console.warn('[WebRTC] replaceTrack error:', err);
+        }
+      }
+    }
+  }
+}
+
 
 /** Modify SDP to allocate ultra-high definition bitrate (10 Mbps) with Google min/start bitrate flags */
 function boostSdpBitrate(sdp: string, bitrateKbps = 10000): string {
@@ -564,7 +590,11 @@ export function getOrCreatePeerConnection(
 
   if (localStream) {
     localStream.getTracks().forEach((track) => {
-      pc.addTrack(track, localStream!);
+      if (track.kind === 'video' && currentCustomVideoTrack && currentCustomVideoTrack.readyState === 'live') {
+        pc.addTrack(currentCustomVideoTrack, localStream!);
+      } else {
+        pc.addTrack(track, localStream!);
+      }
     });
   }
 
@@ -578,6 +608,12 @@ export function getOrCreatePeerConnection(
     }
     remoteStreams.set(targetParticipantId, stream);
     notifyStreamSubscribers();
+
+    if (event.track) {
+      event.track.onunmute = () => {
+        notifyStreamSubscribers();
+      };
+    }
   };
 
   const socket = getSocket();
@@ -615,6 +651,8 @@ export async function initiatePeerConnection(
     console.warn('[WebRTC] Local stream not ready when initiating, continuing...', e);
   }
 
+  // Always cleanly close any existing peer connection before initiating a fresh session
+  closePeerConnection(targetParticipantId);
   const pc = getOrCreatePeerConnection(roomId, myParticipantId, targetParticipantId);
   const socket = getSocket();
 
@@ -674,6 +712,9 @@ export async function handleWebRTCSignal(
   if ('type' in signal) {
     if (signal.type === 'offer') {
       try {
+        // Peer is initiating a new connection -> cleanly close any previous session
+        closePeerConnection(peerId);
+
         // Ensure local stream tracks are available before answering so remote peer gets video!
         try {
           const stream = await getLocalStream();
@@ -747,10 +788,12 @@ export function closePeerConnection(targetParticipantId?: string): void {
     pc?.close();
     peerConnections.delete(targetParticipantId);
     remoteStreams.delete(targetParticipantId);
+    pendingCandidates.delete(targetParticipantId);
   } else {
     peerConnections.forEach((pc) => pc.close());
     peerConnections.clear();
     remoteStreams.clear();
+    pendingCandidates.clear();
   }
   notifyStreamSubscribers();
 }
