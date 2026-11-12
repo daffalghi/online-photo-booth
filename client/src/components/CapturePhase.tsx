@@ -50,19 +50,24 @@ import {
   SparklesIcon,
   UploadIcon,
   TrashIcon,
+  LivePhotoIcon,
 } from './Icons';
 import { useLanguage } from '@/lib/i18n';
 import { getServerUrl } from '@/lib/config';
+import LivePhoto from './LivePhoto';
+import { LivePhotoRecorder } from '@/lib/livePhoto';
 
 function RemoteVideoTile({
   stream,
   previewUrl,
+  liveVideoUrl,
   showPreview,
   displayName,
   isHost,
 }: {
   stream?: MediaStream;
   previewUrl?: string;
+  liveVideoUrl?: string;
   showPreview: boolean;
   displayName: string;
   isHost: boolean;
@@ -79,8 +84,7 @@ function RemoteVideoTile({
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '160px', overflow: 'hidden', background: '#0b0c13', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {showPreview && previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <LivePhoto photoUrl={previewUrl} liveVideoUrl={liveVideoUrl} alt={displayName} className="w-full h-full" />
       ) : stream ? (
         <video
           ref={videoRef}
@@ -188,10 +192,14 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const [camOn, setCamOn] = useState(isCameraEnabled());
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isMirrored, setIsMirrored] = useState(false);
+  const [isLivePhoto, setIsLivePhoto] = useState(true);
   const filterRef = useRef<FilterType>(filter);
   filterRef.current = filter;
   const mirrorRef = useRef<boolean>(isMirrored);
   mirrorRef.current = isMirrored;
+  const livePhotoRef = useRef<boolean>(isLivePhoto);
+  livePhotoRef.current = isLivePhoto;
+  const livePhotoRecorderRef = useRef<LivePhotoRecorder>(new LivePhotoRecorder());
   const triggerCaptureRef = useRef<(slotIdx: number) => void>(() => {});
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const captureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -742,6 +750,16 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       setCountdown(initialSec);
       setCountdownKey((k) => k + 1);
 
+      // Start Live Photo recording if enabled
+      if (livePhotoRef.current && localVideoRef.current) {
+        livePhotoRecorderRef.current.startRecording({
+          videoEl: localVideoRef.current,
+          canvasEl: bgRef.current.type !== 'none' ? (virtualCanvasRef.current || bgControllerRef.current?.getCanvas()) : null,
+          filter: filterRef.current,
+          mirror: mirrorRef.current,
+        });
+      }
+
       countdownIntervalRef.current = setInterval(() => {
         const remainingMs = endTime - performance.now();
         const remainingSec = Math.ceil(remainingMs / 1000);
@@ -775,6 +793,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     };
 
     const onRetakeRequested = () => {
+      livePhotoRecorderRef.current.stop();
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
       countdownIntervalRef.current = null;
@@ -793,6 +812,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     socket.on('capture:retakeRequested', onRetakeRequested);
 
     return () => {
+      livePhotoRecorderRef.current.stop();
       socket.off('capture:readyStatus', onReadyStatus);
       socket.off('capture:countdown', onCountdown);
       socket.off('capture:keepStatus', onKeepStatus);
@@ -852,10 +872,21 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         dataUrl = await captureFrame(localVideoRef.current, activeFilter, undefined, undefined, activeMirror);
       }
 
+      // Record 450ms post-shutter for natural iPhone Live Photo motion
+      let liveVideoDataUrl: string | undefined = undefined;
+      if (livePhotoRef.current) {
+        await new Promise((r) => setTimeout(r, 450));
+        const liveRes = await livePhotoRecorderRef.current.stopRecording();
+        if (liveRes?.dataUrl) {
+          liveVideoDataUrl = liveRes.dataUrl;
+        }
+      }
+
       socket.emit('capture:frameUpload', {
         roomId: room.id,
         slotIndex: currentSlotIndex,
         photoDataUrl: dataUrl,
+        liveVideoDataUrl,
         filters: activeFilter !== 'none' ? [activeFilter] : [],
       });
     } catch (e) {
@@ -890,6 +921,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
 
   const showPreview = Boolean(roundStatus === 'previewing' && (currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl || (currentSlot?.photos && currentSlot.photos.length > 0)));
   const previewUrl = currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl;
+  const previewLiveVideoUrl = currentSlot?.leftLiveVideoUrl || currentSlot?.rightLiveVideoUrl;
   const showPostKeep = roundStatus === 'locked';
 
   return (
@@ -983,8 +1015,12 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
             }}
           />
           {showPreview && previewUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="Preview Foto Solo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <LivePhoto
+              photoUrl={previewUrl}
+              liveVideoUrl={previewLiveVideoUrl}
+              alt="Preview Foto Solo"
+              className="w-full h-full"
+            />
           )}
 
           {/* Camera Off Feedback Overlay */}
@@ -1025,6 +1061,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
           {participants.map((p) => {
             const isMe = p.id === myParticipantId;
             const pPhoto = currentSlot?.photos?.find((sp) => sp.participantId === p.id)?.url || (p.side === 'left' ? currentSlot?.leftPhotoUrl : currentSlot?.rightPhotoUrl);
+            const pLiveVideo = currentSlot?.photos?.find((sp) => sp.participantId === p.id)?.liveVideoUrl || (p.side === 'left' ? currentSlot?.leftLiveVideoUrl : currentSlot?.rightLiveVideoUrl);
 
             return (
               <div
@@ -1066,8 +1103,12 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                       }}
                     />
                     {showPreview && pPhoto && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={pPhoto} alt={p.displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <LivePhoto
+                        photoUrl={pPhoto}
+                        liveVideoUrl={pLiveVideo}
+                        alt={p.displayName}
+                        className="w-full h-full"
+                      />
                     )}
                     {!camOn && !showPreview && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '6px', zIndex: 12 }}>
@@ -1080,6 +1121,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                   <RemoteVideoTile
                     stream={remoteStreams.get(p.id)}
                     previewUrl={pPhoto}
+                    liveVideoUrl={pLiveVideo}
                     showPreview={showPreview}
                     displayName={p.displayName}
                     isHost={p.isHost}
@@ -1129,9 +1171,13 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
                   }}
                 />
-                {showPreview && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={currentSlot?.leftPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {showPreview && currentSlot?.leftPhotoUrl && (
+                  <LivePhoto
+                    photoUrl={currentSlot.leftPhotoUrl}
+                    liveVideoUrl={currentSlot.leftLiveVideoUrl}
+                    alt="Preview"
+                    className="w-full h-full"
+                  />
                 )}
                 {!camOn && !showPreview && (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '8px', zIndex: 12 }}>
@@ -1163,9 +1209,13 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     </button>
                   </div>
                 )}
-                {showPreview && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={currentSlot?.leftPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {showPreview && currentSlot?.leftPhotoUrl && (
+                  <LivePhoto
+                    photoUrl={currentSlot.leftPhotoUrl}
+                    liveVideoUrl={currentSlot.leftLiveVideoUrl}
+                    alt="Preview"
+                    className="w-full h-full"
+                  />
                 )}
               </>
             )}
@@ -1207,9 +1257,13 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
                   }}
                 />
-                {showPreview && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={currentSlot?.rightPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {showPreview && currentSlot?.rightPhotoUrl && (
+                  <LivePhoto
+                    photoUrl={currentSlot.rightPhotoUrl}
+                    liveVideoUrl={currentSlot.rightLiveVideoUrl}
+                    alt="Preview"
+                    className="w-full h-full"
+                  />
                 )}
                 {!camOn && !showPreview && (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#090b12', gap: '8px', zIndex: 12 }}>
@@ -1241,9 +1295,13 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     </button>
                   </div>
                 )}
-                {showPreview && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={currentSlot?.rightPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {showPreview && currentSlot?.rightPhotoUrl && (
+                  <LivePhoto
+                    photoUrl={currentSlot.rightPhotoUrl}
+                    liveVideoUrl={currentSlot.rightLiveVideoUrl}
+                    alt="Preview"
+                    className="w-full h-full"
+                  />
                 )}
               </>
             )}
@@ -1345,6 +1403,23 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
           >
             <MirrorIcon size={18} />
             <span>{isMirrored ? 'Mirror: On' : 'Mirror: Off'}</span>
+          </button>
+        </div>
+
+        {/* Live Photo Toggle Button (iPhone style) */}
+        <div className="subcam-toggle-group">
+          <button
+            type="button"
+            onClick={() => !isCaptureLocked && setIsLivePhoto((prev) => !prev)}
+            disabled={isCaptureLocked}
+            className={`subcam-btn ${isLivePhoto ? 'subcam-btn-active !text-amber-400 !border-amber-400/40' : 'subcam-btn-neutral'}`}
+            title={isLivePhoto ? 'Live Photo Aktif (Merekam klip video bergerak ala iPhone)' : 'Live Photo Mati (Foto statis biasa)'}
+            id="toggle-live-photo-btn"
+          >
+            <LivePhotoIcon size={18} active={isLivePhoto} className={isLivePhoto ? 'text-amber-400' : ''} />
+            <span className={isLivePhoto ? 'text-amber-300 font-semibold' : ''}>
+              {isLivePhoto ? 'Live: On' : 'Live: Off'}
+            </span>
           </button>
         </div>
       </div>

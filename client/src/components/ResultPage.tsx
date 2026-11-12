@@ -7,9 +7,22 @@ import { Socket } from 'socket.io-client';
 import { PairedShot, Participant, Room } from '@/types';
 import { FRAME_TEMPLATES } from '@/lib/frameTemplates';
 import { compositePreview } from '@/lib/composite';
-import { DownloadIcon, CopyIcon, CheckIcon, PlusIcon, HomeIcon, PaletteIcon, TrashIcon, ShieldCheckIcon } from './Icons';
-import { getServerUrl } from '@/lib/config';
+import {
+  DownloadIcon,
+  CopyIcon,
+  CheckIcon,
+  PlusIcon,
+  HomeIcon,
+  PaletteIcon,
+  TrashIcon,
+  ShieldCheckIcon,
+  LivePhotoIcon,
+  VideoIcon,
+} from './Icons';
+import { getServerUrl, resolveMediaUrl } from '@/lib/config';
 import CreatorCard from './CreatorCard';
+import LivePhoto from './LivePhoto';
+import { renderLiveVideoStrip } from '@/lib/livePhoto';
 
 interface ResultPageProps {
   room: Room;
@@ -39,6 +52,41 @@ export default function ResultPage({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeletedSuccess, setIsDeletedSuccess] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [isGeneratingLiveStrip, setIsGeneratingLiveStrip] = useState(false);
+  const [liveStripProgress, setLiveStripProgress] = useState(0);
+
+  const hasLivePhotos = slots.some(
+    (s) => Boolean(s.leftLiveVideoUrl || s.rightLiveVideoUrl || s.photos?.some((p) => p.liveVideoUrl))
+  );
+
+  async function handleDownloadLiveStrip() {
+    if (isGeneratingLiveStrip) return;
+    setIsGeneratingLiveStrip(true);
+    setLiveStripProgress(0);
+    try {
+      const renderCanvas = document.createElement('canvas');
+      const result = await renderLiveVideoStrip({
+        canvas: renderCanvas,
+        slots,
+        template,
+        captionText,
+        accentColor,
+        selectedOrder: room.settings.selectedPhotoOrder,
+        photoOffsets: room.settings.photoOffsets,
+        isSolo,
+        onProgress: (p) => setLiveStripProgress(p),
+      });
+
+      const a = document.createElement('a');
+      a.href = result.url;
+      a.download = `snapsync-live-strip-${room.code}.${result.ext}`;
+      a.click();
+    } catch (err) {
+      console.error('Failed to generate animated video strip:', err);
+    } finally {
+      setIsGeneratingLiveStrip(false);
+    }
+  }
 
   const template = FRAME_TEMPLATES.find((t) => t.id === frameTemplateId) ?? FRAME_TEMPLATES[0];
   const accentColor = customization?.accentColor || template.accent_color;
@@ -257,6 +305,38 @@ export default function ResultPage({
               <DownloadIcon size={18} /> Unduh Foto HD (PNG)
             </button>
 
+            {hasLivePhotos && (
+              <button
+                className="btn btn-secondary btn-lg"
+                style={{
+                  width: '100%',
+                  borderColor: 'rgba(251, 191, 36, 0.4)',
+                  background: 'rgba(251, 191, 36, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+                onClick={handleDownloadLiveStrip}
+                disabled={isGeneratingLiveStrip || compositing}
+                id="download-live-strip-btn"
+              >
+                {isGeneratingLiveStrip ? (
+                  <>
+                    <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#f59e0b' }} />
+                    <span style={{ color: '#fbbf24', fontWeight: 700 }}>
+                      Memproses Video Strip ({Math.round(liveStripProgress * 100)}%)…
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <LivePhotoIcon size={18} active={true} style={{ color: '#fbbf24' }} />
+                    <span style={{ color: '#fbbf24', fontWeight: 700 }}>Unduh Live Video Strip (Bergerak)</span>
+                  </>
+                )}
+              </button>
+            )}
+
             <button
               className="btn btn-secondary btn-md"
               style={{ width: '100%' }}
@@ -358,6 +438,109 @@ export default function ResultPage({
           </div>
         </div>
       </div>
+
+      {/* Live Photo Gallery Card */}
+      {hasLivePhotos && (
+        <div className="glass-card" style={{ width: '100%', padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px', border: '1px solid rgba(251, 191, 36, 0.25)', background: 'rgba(251, 191, 36, 0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LivePhotoIcon size={22} active={true} style={{ color: '#fbbf24' }} />
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Koleksi Live Photo iPhone</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                  Arahkan kursor (*hover*) di laptop atau sentuh & tahan (*touch & hold*) di smartphone untuk memutar foto bergerak.
+                </p>
+              </div>
+            </div>
+            <span className="badge" style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)', fontSize: '11px' }}>
+              Live Photo Aktif
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px', marginTop: '6px' }}>
+            {slots.flatMap((slot) => {
+              const items: { id: string; photoUrl: string; liveVideoUrl?: string; label: string }[] = [];
+              if (slot.photos && slot.photos.length > 0) {
+                slot.photos.forEach((p, idx) => {
+                  items.push({
+                    id: `${slot.slotIndex}_${p.participantId || idx}`,
+                    photoUrl: resolveMediaUrl(p.url),
+                    liveVideoUrl: p.liveVideoUrl ? resolveMediaUrl(p.liveVideoUrl) : undefined,
+                    label: `Pose #${slot.slotIndex + 1} - ${p.displayName || p.side}`,
+                  });
+                });
+              } else if (isSolo) {
+                const photoUrl = slot.leftPhotoUrl || slot.rightPhotoUrl;
+                const liveVideoUrl = slot.leftLiveVideoUrl || slot.rightLiveVideoUrl;
+                if (photoUrl) {
+                  items.push({
+                    id: `${slot.slotIndex}_solo`,
+                    photoUrl: resolveMediaUrl(photoUrl),
+                    liveVideoUrl: liveVideoUrl ? resolveMediaUrl(liveVideoUrl) : undefined,
+                    label: `Pose #${slot.slotIndex + 1}`,
+                  });
+                }
+              } else {
+                if (slot.leftPhotoUrl) {
+                  items.push({
+                    id: `${slot.slotIndex}_left`,
+                    photoUrl: resolveMediaUrl(slot.leftPhotoUrl),
+                    liveVideoUrl: slot.leftLiveVideoUrl ? resolveMediaUrl(slot.leftLiveVideoUrl) : undefined,
+                    label: `Pose #${slot.slotIndex + 1} (Kiri)`,
+                  });
+                }
+                if (slot.rightPhotoUrl) {
+                  items.push({
+                    id: `${slot.slotIndex}_right`,
+                    photoUrl: resolveMediaUrl(slot.rightPhotoUrl),
+                    liveVideoUrl: slot.rightLiveVideoUrl ? resolveMediaUrl(slot.rightLiveVideoUrl) : undefined,
+                    label: `Pose #${slot.slotIndex + 1} (Kanan)`,
+                  });
+                }
+              }
+              return items;
+            }).map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  position: 'relative',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  background: '#12141e',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4' }}>
+                  <LivePhoto
+                    photoUrl={item.photoUrl}
+                    liveVideoUrl={item.liveVideoUrl}
+                    alt={item.label}
+                    className="w-full h-full"
+                  />
+                </div>
+                <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>{item.label}</span>
+                  {item.liveVideoUrl && (
+                    <a
+                      href={item.liveVideoUrl}
+                      download={`live-photo-${item.id}.mp4`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-ghost btn-xs"
+                      title="Unduh klip video ini"
+                      style={{ padding: '2px 6px', fontSize: '10px' }}
+                    >
+                      <DownloadIcon size={12} /> Video
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Creator & Support Card */}
       <div style={{ width: '100%', maxWidth: '680px', marginTop: '12px' }}>

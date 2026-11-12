@@ -427,7 +427,7 @@ function fillPlaceholder(ctx: CanvasRenderingContext2D, box: FrameBox, color: st
 /** Center-Cover Auto-Crop: preserves natural aspect ratio and supports panning & scaling */
 export function drawCoverImage(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
   destX: number,
   destY: number,
   destW: number,
@@ -437,8 +437,8 @@ export function drawCoverImage(
   offsetY: number = 0,
   scale: number = 1.0,
 ): void {
-  const imgW = img.naturalWidth || img.width;
-  const imgH = img.naturalHeight || img.height;
+  const imgW = (img as HTMLVideoElement).videoWidth || (img as HTMLImageElement).naturalWidth || img.width;
+  const imgH = (img as HTMLVideoElement).videoHeight || (img as HTMLImageElement).naturalHeight || img.height;
   const imgRatio = imgW / imgH;
   const destRatio = destW / destH;
 

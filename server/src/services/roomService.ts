@@ -179,7 +179,15 @@ export async function updateParticipantConnection(participantId: string, status:
 
 // ─── Photo ─────────────────────────────────────────────────────────────────
 
-export async function savePhoto(roomId: string, participantId: string, side: string, slotIndex: number, storageKey: string, filters: string[] = []): Promise<Photo> {
+export async function savePhoto(
+  roomId: string,
+  participantId: string,
+  side: string,
+  slotIndex: number,
+  storageKey: string,
+  filters: string[] = [],
+  liveVideoKey?: string | null,
+): Promise<Photo> {
   const id = uuidv4();
   await knex<PhotoRow>('photos').insert({
     id,
@@ -188,6 +196,7 @@ export async function savePhoto(roomId: string, participantId: string, side: str
     side,
     slot_index: slotIndex,
     storage_key: storageKey,
+    live_video_key: liveVideoKey || null,
     filters_json: JSON.stringify(filters),
     captured_at: Date.now(),
     kept_by_json: '[]',
@@ -223,7 +232,11 @@ export async function markPhotoKept(roomId: string, slotIndex: number, participa
 
 export async function deleteSlotPhotos(roomId: string, slotIndex: number): Promise<string[]> {
   const photos = await getPhotosForSlot(roomId, slotIndex);
-  const keys = photos.map((p) => p.storageKey);
+  const keys: string[] = [];
+  photos.forEach((p) => {
+    if (p.storageKey) keys.push(p.storageKey);
+    if (p.liveVideoKey) keys.push(p.liveVideoKey);
+  });
   await knex('photos').where('room_id', roomId).where('slot_index', slotIndex).delete();
   return keys;
 }
@@ -251,6 +264,7 @@ export async function getPairedShots(roomId: string, baseUrl: string): Promise<P
         participantId: p.participantId,
         side: p.side,
         url: `${baseUrl}/uploads/${p.storageKey}`,
+        liveVideoUrl: p.liveVideoKey ? `${baseUrl}/uploads/${p.liveVideoKey}` : undefined,
         displayName: foundParticipant?.displayName || p.side,
       };
     });
@@ -264,6 +278,8 @@ export async function getPairedShots(roomId: string, baseUrl: string): Promise<P
       slotIndex,
       leftPhotoUrl: leftPhoto ? `${baseUrl}/uploads/${leftPhoto.storageKey}` : '',
       rightPhotoUrl: rightPhoto ? `${baseUrl}/uploads/${rightPhoto.storageKey}` : '',
+      leftLiveVideoUrl: leftPhoto?.liveVideoKey ? `${baseUrl}/uploads/${leftPhoto.liveVideoKey}` : undefined,
+      rightLiveVideoUrl: rightPhoto?.liveVideoKey ? `${baseUrl}/uploads/${rightPhoto.liveVideoKey}` : undefined,
       keptByParticipantIds: allKeptIds,
       status: allKept ? 'locked' : 'previewing',
       photos: participantPhotos,
@@ -533,8 +549,10 @@ function mapPhoto(row: PhotoRow): Photo {
     slotIndex: row.slot_index,
     storageKey: row.storage_key,
     url: '',
-    filtersApplied: JSON.parse(row.filters_json),
+    liveVideoKey: row.live_video_key || undefined,
+    liveVideoUrl: '',
+    filtersApplied: JSON.parse(row.filters_json || '[]'),
     capturedAt: row.captured_at,
-    keptByParticipantIds: JSON.parse(row.kept_by_json),
+    keptByParticipantIds: JSON.parse(row.kept_by_json || '[]'),
   };
 }

@@ -73,10 +73,18 @@ export async function initDb(): Promise<void> {
       t.string('side').notNullable();
       t.integer('slot_index').notNullable();
       t.string('storage_key').notNullable();
+      t.string('live_video_key').nullable();
       t.text('filters_json').notNullable().defaultTo('[]');
       t.bigInteger('captured_at').notNullable();
       t.text('kept_by_json').notNullable().defaultTo('[]');
     });
+  } else {
+    // Migration: ensure live_video_key column exists
+    if (!(await knex.schema.hasColumn('photos', 'live_video_key'))) {
+      await knex.schema.table('photos', (t) => {
+        t.string('live_video_key').nullable();
+      });
+    }
   }
 
   // Frame templates

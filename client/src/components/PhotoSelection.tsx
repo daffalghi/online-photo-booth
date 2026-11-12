@@ -23,6 +23,7 @@ import {
   MicOffIcon,
 } from './Icons';
 import { resolveMediaUrl } from '@/lib/config';
+import LivePhoto from './LivePhoto';
 
 interface PhotoSelectionProps {
   room: Room;
@@ -39,6 +40,7 @@ export interface IndividualPhoto {
   slotIndex: number;
   side: 'left' | 'right' | string;
   url: string;
+  liveVideoUrl?: string;
   participantName: string;
   isMe: boolean;
 }
@@ -115,18 +117,21 @@ export default function PhotoSelection({
             slotIndex: slot.slotIndex,
             side: sp.side || 'left',
             url: resolveMediaUrl(sp.url),
+            liveVideoUrl: sp.liveVideoUrl ? resolveMediaUrl(sp.liveVideoUrl) : undefined,
             participantName: sp.displayName || participant?.displayName || `Peserta ${pIdx + 1}`,
             isMe: sp.participantId === myParticipantId,
           });
         });
       } else if (isSolo) {
         const photoUrl = slot.leftPhotoUrl || slot.rightPhotoUrl;
+        const liveVideoUrl = slot.leftLiveVideoUrl || slot.rightLiveVideoUrl;
         if (photoUrl) {
           list.push({
             id: `${slot.slotIndex}_left`,
             slotIndex: slot.slotIndex,
             side: 'left',
             url: resolveMediaUrl(photoUrl),
+            liveVideoUrl: liveVideoUrl ? resolveMediaUrl(liveVideoUrl) : undefined,
             participantName: me?.displayName || 'Foto Saya',
             isMe: true,
           });
@@ -141,6 +146,7 @@ export default function PhotoSelection({
             slotIndex: slot.slotIndex,
             side: 'left',
             url: resolveMediaUrl(slot.leftPhotoUrl),
+            liveVideoUrl: slot.leftLiveVideoUrl ? resolveMediaUrl(slot.leftLiveVideoUrl) : undefined,
             participantName: leftP?.displayName || 'Person 1',
             isMe: leftP?.id === myParticipantId,
           });
@@ -151,6 +157,7 @@ export default function PhotoSelection({
             slotIndex: slot.slotIndex,
             side: 'right',
             url: resolveMediaUrl(slot.rightPhotoUrl),
+            liveVideoUrl: slot.rightLiveVideoUrl ? resolveMediaUrl(slot.rightLiveVideoUrl) : undefined,
             participantName: rightP?.displayName || 'Person 2',
             isMe: rightP?.id === myParticipantId,
           });
@@ -916,16 +923,11 @@ export default function PhotoSelection({
                     }}
                     title={isPlaced ? `Foto ini sudah dipakai di Slot #${placedSlots.join(', #')} (Klik untuk tambah ke slot lain)` : 'Klik atau drag foto ini ke slot frame'}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={photo.url}
+                    <LivePhoto
+                      photoUrl={photo.url}
+                      liveVideoUrl={photo.liveVideoUrl}
                       alt={photo.participantName}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
+                      className="w-full h-full"
                     />
 
                     {/* Top info badge */}

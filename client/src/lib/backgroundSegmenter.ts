@@ -413,6 +413,10 @@ export class BackgroundRenderController {
     ctx.restore();
   }
 
+  getCanvas(): HTMLCanvasElement | null {
+    return this.canvasEl;
+  }
+
   /**
    * Captures the current live composition (or segmented frame) as high quality dataUrl
    */

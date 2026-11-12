@@ -152,8 +152,8 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
 
 
   // ── Frame uploaded from client ───────────────────────────────────────────
-  socket.on('capture:frameUpload', async (payload: { roomId: string; slotIndex: number; photoDataUrl: string; filters: string[] }) => {
-    const { roomId, slotIndex, photoDataUrl, filters } = payload;
+  socket.on('capture:frameUpload', async (payload: { roomId: string; slotIndex: number; photoDataUrl: string; liveVideoDataUrl?: string; filters: string[] }) => {
+    const { roomId, slotIndex, photoDataUrl, liveVideoDataUrl, filters } = payload;
     const participantId = socket.participantId;
     if (!participantId) return;
 
@@ -172,7 +172,21 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
       const filePath = path.join(UPLOADS_DIR, storageKey);
 
       await fs.promises.writeFile(filePath, imageBuffer);
-      await roomService.savePhoto(roomId, participantId, participant.side, slotIndex, storageKey, filters);
+
+      let liveVideoKey: string | undefined = undefined;
+      if (liveVideoDataUrl) {
+        const videoMatches = liveVideoDataUrl.match(/^data:video\/(\w+)(?:;[a-zA-Z0-9=\-]+)*;base64,(.+)$/);
+        if (videoMatches) {
+          const rawExt = videoMatches[1].toLowerCase();
+          const ext = rawExt === 'mp4' ? 'mp4' : 'webm';
+          const videoBuffer = Buffer.from(videoMatches[2], 'base64');
+          liveVideoKey = `${roomId}_slot${slotIndex}_${participant.side}_${Date.now()}.${ext}`;
+          const videoPath = path.join(UPLOADS_DIR, liveVideoKey);
+          await fs.promises.writeFile(videoPath, videoBuffer);
+        }
+      }
+
+      await roomService.savePhoto(roomId, participantId, participant.side, slotIndex, storageKey, filters, liveVideoKey);
 
       // Track in-memory for round completion check
       if (!uploadMap.has(roomId)) uploadMap.set(roomId, new Map());
@@ -197,6 +211,8 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
           slotIndex,
           leftPhotoUrl: thisShot?.leftPhotoUrl || `${baseUrl}/uploads/${storageKey}`,
           rightPhotoUrl: thisShot?.rightPhotoUrl || `${baseUrl}/uploads/${storageKey}`,
+          leftLiveVideoUrl: thisShot?.leftLiveVideoUrl,
+          rightLiveVideoUrl: thisShot?.rightLiveVideoUrl,
           photos: thisShot?.photos || [],
         });
         await broadcastRoomState(io, roomId, baseUrl);

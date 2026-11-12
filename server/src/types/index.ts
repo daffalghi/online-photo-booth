@@ -75,6 +75,8 @@ export interface Photo {
   slotIndex: number;
   storageKey: string;
   url: string;
+  liveVideoKey?: string;
+  liveVideoUrl?: string;
   filtersApplied: string[];
   capturedAt: number;
   keptByParticipantIds: string[];
@@ -171,6 +173,7 @@ export interface PhotoRow {
   side: ParticipantSide;
   slot_index: number;
   storage_key: string;
+  live_video_key?: string | null;
   filters_json: string;
   captured_at: number;
   kept_by_json: string;
@@ -197,6 +200,7 @@ export interface ParticipantPhoto {
   participantId: string;
   side: string;
   url: string;
+  liveVideoUrl?: string;
   displayName?: string;
 }
 
@@ -204,6 +208,8 @@ export interface PairedShot {
   slotIndex: number;
   leftPhotoUrl: string;
   rightPhotoUrl: string;
+  leftLiveVideoUrl?: string;
+  rightLiveVideoUrl?: string;
   keptByParticipantIds: string[];
   status: RoundStatus;
   photos?: ParticipantPhoto[];

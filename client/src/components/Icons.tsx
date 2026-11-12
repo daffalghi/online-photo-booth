@@ -533,4 +533,14 @@ export function SearchIcon({ size = 18, ...props }: IconProps) {
   );
 }
 
+export function LivePhotoIcon({ size = 20, active = false, ...props }: IconProps & { active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="10" strokeDasharray="3 3" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2.2" fill={active ? 'currentColor' : 'none'} />
+    </svg>
+  );
+}
+
 
