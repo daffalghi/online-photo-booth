@@ -1,6 +1,8 @@
 import { FilterType, FILTER_CONFIGS } from './capture';
 import { ExtendedFrameTemplate, getCanvasLayout, resolveOrderedPhotoUrls, drawCoverImage } from './frameTemplates';
 import { PairedShot } from '@/types';
+// @ts-ignore
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 /** Supported video mime types with fallback hierarchy */
 export function getSupportedVideoMimeType(): { mimeType: string; ext: 'mp4' | 'webm' } {
@@ -233,12 +235,14 @@ export interface LiveStripRenderOptions {
   motionDurationMs?: number;
   stillHoldDurationMs?: number;
   durationMs?: number;
+  loopCycles?: number;
   onProgress?: (ratio: number) => void;
 }
 
 /**
  * Renders a full animated video photostrip from Live Photo clips.
  * Loops through the live video clips (5s motion) followed by still photo hold (3s),
+ * repeated for `loopCycles` (default 2 cycles = ~16s), so video players don't just stop instantly,
  * applies frame overlay & captions, and records the output stream to MP4/WebM!
  */
 export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Promise<{ blob: Blob; url: string; ext: 'mp4' | 'webm' }> {
@@ -253,10 +257,12 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
     isSolo = false,
     motionDurationMs = 5000,
     stillHoldDurationMs = 3000,
+    loopCycles = 2,
     onProgress,
   } = options;
 
-  const totalDurationMs = options.durationMs || (motionDurationMs + stillHoldDurationMs);
+  const singleCycleDuration = motionDurationMs + stillHoldDurationMs;
+  const totalDurationMs = options.durationMs || (singleCycleDuration * Math.max(1, loopCycles));
 
   const layout = getCanvasLayout(template, isSolo);
   canvas.width = layout.width;
@@ -381,17 +387,32 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
     recorder.start(100);
 
     const startTime = performance.now();
-    let isPausedForHold = false;
+    let currentCycleIndex = 0;
+    let isPausedForCycleHold = false;
 
     function renderFrame() {
       const elapsed = performance.now() - startTime;
       const progress = Math.min(1, elapsed / totalDurationMs);
       if (onProgress) onProgress(progress);
 
-      const isMotionPhase = elapsed < motionDurationMs;
+      const cycleIndex = Math.floor(elapsed / singleCycleDuration);
+      const cycleElapsed = elapsed % singleCycleDuration;
+      const isMotionPhase = cycleElapsed < motionDurationMs;
 
-      if (!isMotionPhase && !isPausedForHold) {
-        isPausedForHold = true;
+      // When transitioning to a new cycle, resume videos
+      if (cycleIndex !== currentCycleIndex) {
+        currentCycleIndex = cycleIndex;
+        isPausedForCycleHold = false;
+        loadedMedia.forEach((m) => {
+          if (m.video) {
+            m.video.currentTime = 0;
+            m.video.play().catch(() => {});
+          }
+        });
+      }
+
+      if (!isMotionPhase && !isPausedForCycleHold) {
+        isPausedForCycleHold = true;
         loadedMedia.forEach((m) => {
           if (m.video) m.video.pause();
         });
@@ -457,5 +478,250 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
 
     requestAnimationFrame(renderFrame);
   });
+}
+
+export interface LiveGifRenderOptions {
+  slots: PairedShot[];
+  template: ExtendedFrameTemplate;
+  captionText: string;
+  accentColor: string;
+  selectedOrder?: (number | string)[];
+  photoOffsets?: Record<number | string, { x?: number; y?: number; scale?: number }>;
+  isSolo?: boolean;
+  motionDurationMs?: number;
+  stillHoldDurationMs?: number;
+  fps?: number;
+  maxWidth?: number;
+  onProgress?: (ratio: number) => void;
+}
+
+/**
+ * Encodes a true animated looping GIF (.gif) with NETSCAPE2.0 infinite loop extension.
+ * This guarantees the animation loops forever in any image viewer, browser, or mobile gallery!
+ */
+export async function renderLiveGifStrip(options: LiveGifRenderOptions): Promise<{ blob: Blob; url: string }> {
+  const {
+    slots,
+    template,
+    captionText,
+    accentColor,
+    selectedOrder,
+    photoOffsets,
+    isSolo = false,
+    motionDurationMs = 5000,
+    stillHoldDurationMs = 3000,
+    fps = 10,
+    maxWidth = 420,
+    onProgress,
+  } = options;
+
+  const layout = getCanvasLayout(template, isSolo);
+  const scale = Math.min(1, maxWidth / layout.width);
+  const gifWidth = Math.round(layout.width * scale);
+  const gifHeight = Math.round(layout.height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = gifWidth;
+  canvas.height = gifHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+
+  const { allUrls } = resolveOrderedPhotoUrls(slots, selectedOrder);
+
+  const getSlotMedia = (idx: number): { photoUrl?: string; videoUrl?: string } => {
+    if (selectedOrder && selectedOrder[idx]) {
+      const item = selectedOrder[idx];
+      if (typeof item === 'string' && item.includes('_')) {
+        const [slotStr, side] = item.split('_');
+        const slotIdx = parseInt(slotStr, 10);
+        const slot = slots.find((s) => s.slotIndex === slotIdx);
+        if (slot) {
+          const photoUrl = side === 'left' ? slot.leftPhotoUrl : slot.rightPhotoUrl;
+          const videoUrl = side === 'left' ? slot.leftLiveVideoUrl : slot.rightLiveVideoUrl;
+          return { photoUrl, videoUrl };
+        }
+      }
+    }
+    const fallbackPhoto = allUrls[idx % Math.max(1, allUrls.length)];
+    const matchingSlot = slots[idx % Math.max(1, slots.length)];
+    const fallbackVideo = matchingSlot?.leftLiveVideoUrl || matchingSlot?.rightLiveVideoUrl;
+    return { photoUrl: fallbackPhoto, videoUrl: fallbackVideo };
+  };
+
+  const getOffset = (idx: number) => {
+    if (!photoOffsets) return { x: 0, y: 0, scale: 1 };
+    const off = Array.isArray(photoOffsets) ? photoOffsets[idx] : photoOffsets[idx] || photoOffsets[String(idx)];
+    return {
+      x: typeof off?.x === 'number' ? off.x : 0,
+      y: typeof off?.y === 'number' ? off.y : 0,
+      scale: typeof off?.scale === 'number' ? off.scale : 1,
+    };
+  };
+
+  let overlayImg: HTMLImageElement | null = null;
+  if (layout.overlayUrl) {
+    try {
+      overlayImg = await preloadImage(layout.overlayUrl);
+    } catch (e) {
+      console.warn('Could not preload frame overlay:', e);
+    }
+  }
+
+  const allBoxes = layout.isTwinStrip
+    ? [...layout.leftBoxes, ...layout.rightBoxes]
+    : [...layout.leftBoxes, ...layout.rightBoxes];
+
+  type MediaItem = { video?: HTMLVideoElement; img?: HTMLImageElement; box: typeof allBoxes[0]; offset: { x: number; y: number; scale: number } };
+  const loadedMedia: MediaItem[] = [];
+
+  for (let i = 0; i < allBoxes.length; i++) {
+    const box = allBoxes[i];
+    const off = getOffset(i);
+    const media = getSlotMedia(i);
+
+    let videoEl: HTMLVideoElement | undefined = undefined;
+    let imgEl: HTMLImageElement | undefined = undefined;
+
+    if (media.videoUrl) {
+      try {
+        videoEl = await preloadVideo(media.videoUrl);
+      } catch (err) {}
+    }
+
+    if (media.photoUrl) {
+      try {
+        imgEl = await preloadImage(media.photoUrl);
+      } catch (err) {}
+    }
+
+    loadedMedia.push({ video: videoEl, img: imgEl, box, offset: off });
+  }
+
+  // Seek video helper
+  const seekVideo = (video: HTMLVideoElement, timeSec: number): Promise<void> => {
+    return new Promise((res) => {
+      let resolved = false;
+      const onSeeked = () => {
+        if (!resolved) {
+          resolved = true;
+          video.removeEventListener('seeked', onSeeked);
+          res();
+        }
+      };
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = Math.min(video.duration || 10, Math.max(0, timeSec));
+      setTimeout(onSeeked, 200); // timeout fallback
+    });
+  };
+
+  const gif = GIFEncoder();
+  const frameIntervalMs = 1000 / fps;
+  const numMotionFrames = Math.max(1, Math.round((motionDurationMs / 1000) * fps));
+  const totalFrames = numMotionFrames + 1; // motion frames + 1 hold still frame
+
+  const drawCurrentComposition = (isMotion: boolean) => {
+    ctx.save();
+    ctx.scale(scale, scale);
+
+    // 1. Clear background
+    ctx.fillStyle = '#0f1016';
+    ctx.fillRect(0, 0, layout.width, layout.height);
+
+    // 2. Draw media
+    for (const m of loadedMedia) {
+      const { box, offset } = m;
+      if (isMotion && m.video && m.video.readyState >= 2) {
+        drawCoverImage(ctx, m.video, box.x, box.y, box.width, box.height, 4, offset.x, offset.y, offset.scale);
+      } else if (m.img) {
+        drawCoverImage(ctx, m.img, box.x, box.y, box.width, box.height, 4, offset.x, offset.y, offset.scale);
+      } else if (m.video) {
+        drawCoverImage(ctx, m.video, box.x, box.y, box.width, box.height, 4, offset.x, offset.y, offset.scale);
+      } else {
+        ctx.fillStyle = '#1a1b24';
+        ctx.beginPath();
+        ctx.roundRect(box.x, box.y, box.width, box.height, 4);
+        ctx.fill();
+      }
+    }
+
+    // 3. Draw overlay
+    if (overlayImg) {
+      if (layout.isTwinStrip && layout.singleStripWidth && layout.singleStripHeight) {
+        const gap = layout.gap || 30;
+        ctx.drawImage(overlayImg, 0, 0, layout.singleStripWidth, layout.singleStripHeight);
+        ctx.drawImage(overlayImg, layout.singleStripWidth + gap, 0, layout.singleStripWidth, layout.singleStripHeight);
+      } else {
+        ctx.drawImage(overlayImg, 0, 0, layout.width, layout.height);
+      }
+    } else {
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 3;
+      allBoxes.forEach((box) => {
+        ctx.beginPath();
+        ctx.roundRect(box.x - 2, box.y - 2, box.width + 4, box.height + 4, 6);
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = accentColor;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SNAPSYNC PHOTOBOOTH', layout.width / 2, 28);
+
+      const text = captionText || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(text, layout.width / 2, layout.height - 10);
+    }
+
+    ctx.restore();
+  };
+
+  // 1. Process motion frames
+  for (let f = 0; f < numMotionFrames; f++) {
+    const timeSec = (f / numMotionFrames) * (motionDurationMs / 1000);
+    
+    // Seek all videos to this time
+    await Promise.all(
+      loadedMedia.map((m) => {
+        if (m.video) return seekVideo(m.video, timeSec);
+        return Promise.resolve();
+      })
+    );
+
+    drawCurrentComposition(true);
+
+    const imgData = ctx.getImageData(0, 0, gifWidth, gifHeight);
+    const pal = quantize(imgData.data, 256);
+    const index = applyPalette(imgData.data, pal);
+
+    // Frame delay in milliseconds
+    const frameDelayMs = Math.round(frameIntervalMs);
+    gif.writeFrame(index, gifWidth, gifHeight, {
+      palette: pal,
+      delay: frameDelayMs,
+      repeat: f === 0 ? 0 : undefined, // 0 = repeat indefinitely!
+    });
+
+    if (onProgress) onProgress((f + 1) / totalFrames);
+  }
+
+  // 2. Process final still hold frame (display duration = stillHoldDurationMs)
+  drawCurrentComposition(false);
+  const stillImgData = ctx.getImageData(0, 0, gifWidth, gifHeight);
+  const stillPal = quantize(stillImgData.data, 256);
+  const stillIndex = applyPalette(stillImgData.data, stillPal);
+
+  gif.writeFrame(stillIndex, gifWidth, gifHeight, {
+    palette: stillPal,
+    delay: stillHoldDurationMs,
+  });
+
+  if (onProgress) onProgress(1);
+
+  gif.finish();
+  const gifBytes = gif.bytes();
+  const blob = new Blob([gifBytes], { type: 'image/gif' });
+  const url = URL.createObjectURL(blob);
+
+  return { blob, url };
 }
 

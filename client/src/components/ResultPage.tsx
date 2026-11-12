@@ -22,7 +22,7 @@ import {
 import { getServerUrl, resolveMediaUrl } from '@/lib/config';
 import CreatorCard from './CreatorCard';
 import LivePhoto from './LivePhoto';
-import { renderLiveVideoStrip } from '@/lib/livePhoto';
+import { renderLiveVideoStrip, renderLiveGifStrip } from '@/lib/livePhoto';
 
 interface ResultPageProps {
   room: Room;
@@ -54,13 +54,15 @@ export default function ResultPage({
   const [deleteError, setDeleteError] = useState('');
   const [isGeneratingLiveStrip, setIsGeneratingLiveStrip] = useState(false);
   const [liveStripProgress, setLiveStripProgress] = useState(0);
+  const [isGeneratingGif, setIsGeneratingGif] = useState(false);
+  const [gifProgress, setGifProgress] = useState(0);
 
   const hasLivePhotos = slots.some(
     (s) => Boolean(s.leftLiveVideoUrl || s.rightLiveVideoUrl || s.photos?.some((p) => p.liveVideoUrl))
   );
 
   async function handleDownloadLiveStrip() {
-    if (isGeneratingLiveStrip) return;
+    if (isGeneratingLiveStrip || isGeneratingGif) return;
     setIsGeneratingLiveStrip(true);
     setLiveStripProgress(0);
     try {
@@ -74,6 +76,7 @@ export default function ResultPage({
         selectedOrder: room.settings.selectedPhotoOrder,
         photoOffsets: room.settings.photoOffsets,
         isSolo,
+        loopCycles: 2, // ~16s video so it loops multiple times cleanly in video players
         onProgress: (p) => setLiveStripProgress(p),
       });
 
@@ -85,6 +88,33 @@ export default function ResultPage({
       console.error('Failed to generate animated video strip:', err);
     } finally {
       setIsGeneratingLiveStrip(false);
+    }
+  }
+
+  async function handleDownloadGifStrip() {
+    if (isGeneratingGif || isGeneratingLiveStrip) return;
+    setIsGeneratingGif(true);
+    setGifProgress(0);
+    try {
+      const result = await renderLiveGifStrip({
+        slots,
+        template,
+        captionText,
+        accentColor,
+        selectedOrder: room.settings.selectedPhotoOrder,
+        photoOffsets: room.settings.photoOffsets,
+        isSolo,
+        onProgress: (p) => setGifProgress(p),
+      });
+
+      const a = document.createElement('a');
+      a.href = result.url;
+      a.download = `snapsync-live-strip-${room.code}.gif`;
+      a.click();
+    } catch (err) {
+      console.error('Failed to generate animated GIF strip:', err);
+    } finally {
+      setIsGeneratingGif(false);
     }
   }
 
@@ -306,35 +336,69 @@ export default function ResultPage({
             </button>
 
             {hasLivePhotos && (
-              <button
-                className="btn btn-secondary btn-lg"
-                style={{
-                  width: '100%',
-                  borderColor: 'rgba(251, 191, 36, 0.4)',
-                  background: 'rgba(251, 191, 36, 0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                }}
-                onClick={handleDownloadLiveStrip}
-                disabled={isGeneratingLiveStrip || compositing}
-                id="download-live-strip-btn"
-              >
-                {isGeneratingLiveStrip ? (
-                  <>
-                    <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#f59e0b' }} />
-                    <span style={{ color: '#fbbf24', fontWeight: 700 }}>
-                      Memproses Video Strip ({Math.round(liveStripProgress * 100)}%)…
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <LivePhotoIcon size={18} active={true} style={{ color: '#fbbf24' }} />
-                    <span style={{ color: '#fbbf24', fontWeight: 700 }}>Unduh Video Strip Bergerak (Loop Animasi)</span>
-                  </>
-                )}
-              </button>
+              <>
+                {/* 1. True Animated GIF */}
+                <button
+                  className="btn btn-secondary btn-lg"
+                  style={{
+                    width: '100%',
+                    borderColor: 'rgba(251, 191, 36, 0.4)',
+                    background: 'rgba(251, 191, 36, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                  onClick={handleDownloadGifStrip}
+                  disabled={isGeneratingGif || isGeneratingLiveStrip || compositing}
+                  id="download-gif-strip-btn"
+                >
+                  {isGeneratingGif ? (
+                    <>
+                      <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#f59e0b' }} />
+                      <span style={{ color: '#fbbf24', fontWeight: 700 }}>
+                        Membuat Animasi GIF ({Math.round(gifProgress * 100)}%)…
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <LivePhotoIcon size={18} active={true} style={{ color: '#fbbf24' }} />
+                      <span style={{ color: '#fbbf24', fontWeight: 700 }}>Unduh Animasi GIF (.gif • Loop Otomatis)</span>
+                    </>
+                  )}
+                </button>
+
+                {/* 2. Looping Video Strip */}
+                <button
+                  className="btn btn-secondary btn-md"
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--text-secondary)',
+                  }}
+                  onClick={handleDownloadLiveStrip}
+                  disabled={isGeneratingLiveStrip || isGeneratingGif || compositing}
+                  id="download-live-strip-btn"
+                >
+                  {isGeneratingLiveStrip ? (
+                    <>
+                      <div className="spinner" style={{ width: '14px', height: '14px', borderTopColor: '#a78bfa' }} />
+                      <span>
+                        Memproses Video Strip ({Math.round(liveStripProgress * 100)}%)…
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <VideoIcon size={16} />
+                      <span>Unduh Video Strip (MP4 / Reels & Story)</span>
+                    </>
+                  )}
+                </button>
+              </>
             )}
 
             <button
