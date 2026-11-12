@@ -22,7 +22,7 @@ import { UPLOADS_DIR, RENDERS_DIR } from './compositeService';
 
 const DEFAULT_SETTINGS: RoomSettings = {
   shotCount: 3,
-  countdownSeconds: 3,
+  countdownSeconds: 5,
   layout: 'strip3',
 };
 

@@ -27,7 +27,7 @@ router.post('/', async (req, res) => {
     const room = await roomService.createRoom(
       {
         shotCount: shotCount ?? (mode === 'solo' ? 4 : 3),
-        countdownSeconds: countdownSeconds ?? 3,
+        countdownSeconds: countdownSeconds ?? 5,
         layout: layout ?? 'strip4',
         mode: mode ?? 'duo',
       },

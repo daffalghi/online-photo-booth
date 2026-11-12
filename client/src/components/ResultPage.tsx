@@ -331,7 +331,7 @@ export default function ResultPage({
                 ) : (
                   <>
                     <LivePhotoIcon size={18} active={true} style={{ color: '#fbbf24' }} />
-                    <span style={{ color: '#fbbf24', fontWeight: 700 }}>Unduh Live Video Strip (Bergerak)</span>
+                    <span style={{ color: '#fbbf24', fontWeight: 700 }}>Unduh Video Strip Bergerak (Loop Animasi)</span>
                   </>
                 )}
               </button>
@@ -448,7 +448,7 @@ export default function ResultPage({
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Koleksi Live Photo iPhone</h3>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                  Arahkan kursor (*hover*) di laptop atau sentuh & tahan (*touch & hold*) di smartphone untuk memutar foto bergerak.
+                  Foto otomatis bergerak 5 detik lalu tampil diam 3 detik secara berulang (animasi loop seperti GIF).
                 </p>
               </div>
             </div>

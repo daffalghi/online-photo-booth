@@ -197,6 +197,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const [camOn, setCamOn] = useState(isCameraEnabled());
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isMirrored, setIsMirrored] = useState(false);
+  const [localCapturedPhoto, setLocalCapturedPhoto] = useState<string | null>(null);
   const isLivePhoto = true;
   const filterRef = useRef<FilterType>(filter);
   filterRef.current = filter;
@@ -803,6 +804,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       countdownIntervalRef.current = null;
       captureTimeoutRef.current = null;
       setCountdown(null);
+      setLocalCapturedPhoto(null);
       setIAmReady(false);
       setReadyParticipantIds([]);
       setLocalKeepStatus([]);
@@ -834,6 +836,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     setReadyParticipantIds([]);
     setLocalKeepStatus([]);
     setCountdown(null);
+    setLocalCapturedPhoto(null);
     setIFinished(false);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
@@ -845,6 +848,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         setIAmReady(false);
       }
       setCountdown(null);
+      setLocalCapturedPhoto(null);
       setLocalKeepStatus([]);
     }
   }, [roundStatus, readyParticipantIds, myParticipantId]);
@@ -874,6 +878,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
 
       if (!dataUrl) {
         dataUrl = await captureFrame(localVideoRef.current, activeFilter, undefined, undefined, activeMirror);
+      }
+
+      if (dataUrl) {
+        setLocalCapturedPhoto(dataUrl);
       }
 
       // Record 450ms post-shutter for natural iPhone Live Photo motion
@@ -923,8 +931,8 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
     socket.emit('capture:finish', { roomId: room.id });
   }
 
-  const showPreview = Boolean(roundStatus === 'previewing' && (currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl || (currentSlot?.photos && currentSlot.photos.length > 0)));
-  const previewUrl = currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl;
+  const showPreview = Boolean(roundStatus === 'previewing' && (localCapturedPhoto || currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl || (currentSlot?.photos && currentSlot.photos.length > 0)));
+  const previewUrl = localCapturedPhoto || currentSlot?.leftPhotoUrl || currentSlot?.rightPhotoUrl;
   const previewLiveVideoUrl = currentSlot?.leftLiveVideoUrl || currentSlot?.rightLiveVideoUrl;
   const showPostKeep = roundStatus === 'locked';
 
@@ -1064,7 +1072,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
         >
           {participants.map((p) => {
             const isMe = p.id === myParticipantId;
-            const pPhoto = currentSlot?.photos?.find((sp) => sp.participantId === p.id)?.url || (p.side === 'left' ? currentSlot?.leftPhotoUrl : currentSlot?.rightPhotoUrl);
+            const pPhoto = (isMe && localCapturedPhoto) || currentSlot?.photos?.find((sp) => sp.participantId === p.id)?.url || (p.side === 'left' ? currentSlot?.leftPhotoUrl : currentSlot?.rightPhotoUrl);
             const pLiveVideo = currentSlot?.photos?.find((sp) => sp.participantId === p.id)?.liveVideoUrl || (p.side === 'left' ? currentSlot?.leftLiveVideoUrl : currentSlot?.rightLiveVideoUrl);
 
             return (
@@ -1175,10 +1183,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
                   }}
                 />
-                {showPreview && currentSlot?.leftPhotoUrl && (
+                {showPreview && ((me?.side === 'left' && localCapturedPhoto) || currentSlot?.leftPhotoUrl) && (
                   <LivePhoto
-                    photoUrl={currentSlot.leftPhotoUrl}
-                    liveVideoUrl={currentSlot.leftLiveVideoUrl}
+                    photoUrl={(me?.side === 'left' && localCapturedPhoto) || currentSlot?.leftPhotoUrl || ''}
+                    liveVideoUrl={currentSlot?.leftLiveVideoUrl}
                     alt="Preview"
                     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
@@ -1213,10 +1221,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     </button>
                   </div>
                 )}
-                {showPreview && currentSlot?.leftPhotoUrl && (
+                {showPreview && ((me?.side === 'left' && localCapturedPhoto) || currentSlot?.leftPhotoUrl) && (
                   <LivePhoto
-                    photoUrl={currentSlot.leftPhotoUrl}
-                    liveVideoUrl={currentSlot.leftLiveVideoUrl}
+                    photoUrl={(me?.side === 'left' && localCapturedPhoto) || currentSlot?.leftPhotoUrl || ''}
+                    liveVideoUrl={currentSlot?.leftLiveVideoUrl}
                     alt="Preview"
                     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
@@ -1261,10 +1269,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     display: (!showPreview && selectedBg.type !== 'none' && camOn) ? 'block' : 'none',
                   }}
                 />
-                {showPreview && currentSlot?.rightPhotoUrl && (
+                {showPreview && ((me?.side === 'right' && localCapturedPhoto) || currentSlot?.rightPhotoUrl) && (
                   <LivePhoto
-                    photoUrl={currentSlot.rightPhotoUrl}
-                    liveVideoUrl={currentSlot.rightLiveVideoUrl}
+                    photoUrl={(me?.side === 'right' && localCapturedPhoto) || currentSlot?.rightPhotoUrl || ''}
+                    liveVideoUrl={currentSlot?.rightLiveVideoUrl}
                     alt="Preview"
                     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
@@ -1299,10 +1307,10 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     </button>
                   </div>
                 )}
-                {showPreview && currentSlot?.rightPhotoUrl && (
+                {showPreview && ((me?.side === 'right' && localCapturedPhoto) || currentSlot?.rightPhotoUrl) && (
                   <LivePhoto
-                    photoUrl={currentSlot.rightPhotoUrl}
-                    liveVideoUrl={currentSlot.rightLiveVideoUrl}
+                    photoUrl={(me?.side === 'right' && localCapturedPhoto) || currentSlot?.rightPhotoUrl || ''}
+                    liveVideoUrl={currentSlot?.rightLiveVideoUrl}
                     alt="Preview"
                     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />

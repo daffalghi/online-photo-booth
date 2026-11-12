@@ -230,13 +230,15 @@ export interface LiveStripRenderOptions {
   selectedOrder?: (number | string)[];
   photoOffsets?: Record<number | string, { x?: number; y?: number; scale?: number }>;
   isSolo?: boolean;
+  motionDurationMs?: number;
+  stillHoldDurationMs?: number;
   durationMs?: number;
   onProgress?: (ratio: number) => void;
 }
 
 /**
  * Renders a full animated video photostrip from Live Photo clips.
- * Loops through the live video clips seamlessly inside frame cutouts,
+ * Loops through the live video clips (5s motion) followed by still photo hold (3s),
  * applies frame overlay & captions, and records the output stream to MP4/WebM!
  */
 export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Promise<{ blob: Blob; url: string; ext: 'mp4' | 'webm' }> {
@@ -249,9 +251,12 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
     selectedOrder,
     photoOffsets,
     isSolo = false,
-    durationMs = 3200,
+    motionDurationMs = 5000,
+    stillHoldDurationMs = 3000,
     onProgress,
   } = options;
+
+  const totalDurationMs = options.durationMs || (motionDurationMs + stillHoldDurationMs);
 
   const layout = getCanvasLayout(template, isSolo);
   canvas.width = layout.width;
@@ -326,7 +331,7 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
       }
     }
 
-    if (!videoEl && media.photoUrl) {
+    if (media.photoUrl) {
       try {
         imgEl = await preloadImage(media.photoUrl);
       } catch (err) {
@@ -376,23 +381,35 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
     recorder.start(100);
 
     const startTime = performance.now();
+    let isPausedForHold = false;
 
     function renderFrame() {
       const elapsed = performance.now() - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
+      const progress = Math.min(1, elapsed / totalDurationMs);
       if (onProgress) onProgress(progress);
+
+      const isMotionPhase = elapsed < motionDurationMs;
+
+      if (!isMotionPhase && !isPausedForHold) {
+        isPausedForHold = true;
+        loadedMedia.forEach((m) => {
+          if (m.video) m.video.pause();
+        });
+      }
 
       // 1. Clear background
       ctx.fillStyle = '#0f1016';
       ctx.fillRect(0, 0, layout.width, layout.height);
 
-      // 2. Draw media into cutout boxes
+      // 2. Draw media into cutout boxes (Motion during 5s, still image during 3s hold)
       for (const m of loadedMedia) {
         const { box, offset } = m;
-        if (m.video && m.video.readyState >= 2) {
+        if (isMotionPhase && m.video && m.video.readyState >= 2) {
           drawCoverImage(ctx, m.video, box.x, box.y, box.width, box.height, 4, offset.x, offset.y, offset.scale);
         } else if (m.img) {
           drawCoverImage(ctx, m.img, box.x, box.y, box.width, box.height, 4, offset.x, offset.y, offset.scale);
+        } else if (m.video) {
+          drawCoverImage(ctx, m.video, box.x, box.y, box.width, box.height, 4, offset.x, offset.y, offset.scale);
         } else {
           ctx.fillStyle = '#1a1b24';
           ctx.beginPath();
@@ -431,7 +448,7 @@ export async function renderLiveVideoStrip(options: LiveStripRenderOptions): Pro
         ctx.fillText(text, layout.width / 2, layout.height - 10);
       }
 
-      if (elapsed < durationMs) {
+      if (elapsed < totalDurationMs) {
         requestAnimationFrame(renderFrame);
       } else {
         recorder.stop();

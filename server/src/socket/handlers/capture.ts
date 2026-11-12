@@ -8,7 +8,7 @@ import { broadcastRoomState } from './room';
 import { AppSocket } from '../../types';
 
 const MAX_SHOTS = 10;
-const DEFAULT_COUNTDOWN_SECONDS = 3;
+const DEFAULT_COUNTDOWN_SECONDS = 5;
 const COUNTDOWN_BUFFER_MS = 800;
 
 // ── In-memory state ─────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ export function handleCaptureEvents(io: Server, socket: AppSocket, baseUrl: stri
     // Start synchronized countdown
     await roomService.updateRoomRound(roomId, slotIndex, 'counting_down');
     const settings = await roomService.getRoomSettings(roomId);
-    const countdownSecs = settings.countdownSeconds || 3;
+    const countdownSecs = settings.countdownSeconds && settings.countdownSeconds >= 4 ? settings.countdownSeconds : DEFAULT_COUNTDOWN_SECONDS;
     const durationMs = countdownSecs * 1000;
     const targetCaptureTimestamp = Date.now() + durationMs;
 
