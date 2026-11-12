@@ -85,7 +85,7 @@ export default function LivePhoto({
   return (
     <div
       className={`relative overflow-hidden group select-none ${className}`}
-      style={style}
+      style={{ width: '100%', height: '100%', ...style }}
       onMouseEnter={autoPlayOnHover ? handleStartPlay : undefined}
       onMouseLeave={autoPlayOnHover ? handleStopPlay : undefined}
       onTouchStart={handleTouchStart}
@@ -99,6 +99,12 @@ export default function LivePhoto({
         className={`w-full h-full object-cover transition-opacity duration-200 ${
           isPlaying ? 'opacity-0' : 'opacity-100'
         } ${imgClassName}`}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: 'block',
+        }}
         loading="lazy"
       />
 
@@ -112,7 +118,14 @@ export default function LivePhoto({
           loop
           preload="metadata"
           onCanPlay={() => setIsReady(true)}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 pointer-events-none ${
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+          className={`transition-opacity duration-200 pointer-events-none ${
             isPlaying ? 'opacity-100' : 'opacity-0'
           }`}
         />

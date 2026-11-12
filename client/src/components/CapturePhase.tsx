@@ -84,7 +84,12 @@ function RemoteVideoTile({
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '160px', overflow: 'hidden', background: '#0b0c13', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {showPreview && previewUrl ? (
-        <LivePhoto photoUrl={previewUrl} liveVideoUrl={liveVideoUrl} alt={displayName} className="w-full h-full" />
+        <LivePhoto
+          photoUrl={previewUrl}
+          liveVideoUrl={liveVideoUrl}
+          alt={displayName}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+        />
       ) : stream ? (
         <video
           ref={videoRef}
@@ -192,13 +197,12 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
   const [camOn, setCamOn] = useState(isCameraEnabled());
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isMirrored, setIsMirrored] = useState(false);
-  const [isLivePhoto, setIsLivePhoto] = useState(true);
+  const isLivePhoto = true;
   const filterRef = useRef<FilterType>(filter);
   filterRef.current = filter;
   const mirrorRef = useRef<boolean>(isMirrored);
   mirrorRef.current = isMirrored;
-  const livePhotoRef = useRef<boolean>(isLivePhoto);
-  livePhotoRef.current = isLivePhoto;
+  const livePhotoRef = useRef<boolean>(true);
   const livePhotoRecorderRef = useRef<LivePhotoRecorder>(new LivePhotoRecorder());
   const triggerCaptureRef = useRef<(slotIdx: number) => void>(() => {});
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -988,7 +992,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
       {/* Camera Viewfinder Box: Single for Solo, Grid for Group, Dual for Duo */}
       {isSolo ? (
         // ─── SOLO CAMERA VIEW (Centered single camera) ──────────────────────────
-        <div className="camera-view-solo">
+        <div className="camera-view-solo" style={{ position: 'relative' }}>
           <video
             ref={localVideoRef}
             autoPlay
@@ -1019,7 +1023,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
               photoUrl={previewUrl}
               liveVideoUrl={previewLiveVideoUrl}
               alt="Preview Foto Solo"
-              className="w-full h-full"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
             />
           )}
 
@@ -1107,7 +1111,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                         photoUrl={pPhoto}
                         liveVideoUrl={pLiveVideo}
                         alt={p.displayName}
-                        className="w-full h-full"
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                       />
                     )}
                     {!camOn && !showPreview && (
@@ -1176,7 +1180,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     photoUrl={currentSlot.leftPhotoUrl}
                     liveVideoUrl={currentSlot.leftLiveVideoUrl}
                     alt="Preview"
-                    className="w-full h-full"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
                 )}
                 {!camOn && !showPreview && (
@@ -1214,7 +1218,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     photoUrl={currentSlot.leftPhotoUrl}
                     liveVideoUrl={currentSlot.leftLiveVideoUrl}
                     alt="Preview"
-                    className="w-full h-full"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
                 )}
               </>
@@ -1262,7 +1266,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     photoUrl={currentSlot.rightPhotoUrl}
                     liveVideoUrl={currentSlot.rightLiveVideoUrl}
                     alt="Preview"
-                    className="w-full h-full"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
                 )}
                 {!camOn && !showPreview && (
@@ -1300,7 +1304,7 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
                     photoUrl={currentSlot.rightPhotoUrl}
                     liveVideoUrl={currentSlot.rightLiveVideoUrl}
                     alt="Preview"
-                    className="w-full h-full"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   />
                 )}
               </>
@@ -1403,23 +1407,6 @@ export default function CapturePhase({ room, participants, myParticipantId, slot
           >
             <MirrorIcon size={18} />
             <span>{isMirrored ? 'Mirror: On' : 'Mirror: Off'}</span>
-          </button>
-        </div>
-
-        {/* Live Photo Toggle Button (iPhone style) */}
-        <div className="subcam-toggle-group">
-          <button
-            type="button"
-            onClick={() => !isCaptureLocked && setIsLivePhoto((prev) => !prev)}
-            disabled={isCaptureLocked}
-            className={`subcam-btn ${isLivePhoto ? 'subcam-btn-active !text-amber-400 !border-amber-400/40' : 'subcam-btn-neutral'}`}
-            title={isLivePhoto ? 'Live Photo Aktif (Merekam klip video bergerak ala iPhone)' : 'Live Photo Mati (Foto statis biasa)'}
-            id="toggle-live-photo-btn"
-          >
-            <LivePhotoIcon size={18} active={isLivePhoto} className={isLivePhoto ? 'text-amber-400' : ''} />
-            <span className={isLivePhoto ? 'text-amber-300 font-semibold' : ''}>
-              {isLivePhoto ? 'Live: On' : 'Live: Off'}
-            </span>
           </button>
         </div>
       </div>

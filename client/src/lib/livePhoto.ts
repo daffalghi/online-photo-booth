@@ -83,6 +83,7 @@ export class LivePhotoRecorder {
           if (!this.isRecording || !ctx || video.paused || video.ended) return;
 
           ctx.save();
+          ctx.clearRect(0, 0, targetW, targetH);
           if (cssFilter && cssFilter !== 'none' && 'filter' in ctx) {
             ctx.filter = cssFilter;
           }
